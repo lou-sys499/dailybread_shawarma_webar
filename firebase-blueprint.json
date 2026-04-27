@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "Dish": {
+      "title": "Dish",
+      "description": "A food item available on the menu.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "calories": { "type": "number" },
+        "ingredients": { "type": "array", "items": { "type": "string" } },
+        "allergens": { "type": "array", "items": { "type": "string" } },
+        "modelUrl": { "type": "string", "description": "URL to the GLB/GLTF 3D model" },
+        "imageUrl": { "type": "string", "description": "Thumbnail image URL" },
+        "categoryId": { "type": "string" },
+        "isSeasonal": { "type": "boolean" },
+        "isAvailable": { "type": "boolean" },
+        "portionSize": { "type": "string", "description": "Real world scale info" }
+      },
+      "required": ["name", "price", "modelUrl"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Menu category (e.g., Appetizers, Main Course).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["name"]
+    }
+  },
+  "firestore": {
+    "dishes": {
+      "schema": "Dish",
+      "description": "Collection of menu items"
+    },
+    "categories": {
+      "schema": "Category",
+      "description": "Collection of dish categories"
+    }
+  }
+}

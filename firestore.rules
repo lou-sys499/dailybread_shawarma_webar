@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isEmailVerified() && (
+        request.auth.token.email == 'austinlouisetx@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['name']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             (!('order' in data) || data.order is number);
+    }
+
+    function isValidDish(data) {
+      return data.keys().hasAll(['name', 'price', 'modelUrl']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             data.price is number && data.price >= 0 &&
+             data.modelUrl is string && data.modelUrl.size() <= 1000 &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+             (!('calories' in data) || data.calories is number) &&
+             (!('ingredients' in data) || data.ingredients is list) &&
+             (!('allergens' in data) || data.allergens is list) &&
+             (!('categoryId' in data) || (data.categoryId is string && isValidId(data.categoryId))) &&
+             (!('isSeasonal' in data) || data.isSeasonal is bool) &&
+             (!('isAvailable' in data) || data.isAvailable is bool) &&
+             (!('portionSize' in data) || (data.portionSize is string && data.portionSize.size() <= 100));
+    }
+
+    // --- Collection Routes ---
+
+    // Categories
+    match /categories/{categoryId} {
+      allow read: if true; // Publicly readable
+      allow create: if isAdmin() && isValidCategory(incoming());
+      allow update: if isAdmin() && isValidCategory(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Dishes
+    match /dishes/{dishId} {
+      allow read: if true; // Publicly readable
+      allow create: if isAdmin() && isValidDish(incoming());
+      allow update: if isAdmin() && isValidDish(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Admin collection (only admin can read/write)
+    match /admins/{adminId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

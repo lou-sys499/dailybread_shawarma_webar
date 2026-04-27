@@ -1,0 +1,11 @@
+{
+  "name": "DailyBread - Shawarma AR",
+  "description": "Visualizing your favorite Shawarmas in 3D. Fast, friendly, and fresh.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "AR_VISUALIZATION",
+    "RESTAURANT_MANAGEMENT"
+  ]
+}
