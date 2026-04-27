@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>DailyBread - AR Shawarma Experience</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <!-- AR.js for A-Frame -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <style>
+      body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+      #loader {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: #FFFDF5;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+        z-index: 1000;
+        transition: opacity 0.5s ease;
+      }
+      .spinner {
+        width: 50px; height: 50px;
+        border: 5px solid #FF6B35;
+        border-top: 5px solid transparent;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      #ui {
+        position: fixed;
+        bottom: 20px; left: 10px; right: 10px;
+        text-align: center;
+        z-index: 100;
+        pointer-events: none;
+      }
+      .badge {
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px 20px;
+        border-radius: 30px;
+        font-weight: 800;
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        color: #FF6B35;
+        text-transform: uppercase;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        display: inline-block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loader">
+      <div class="spinner"></div>
+      <p style="margin-top: 20px; font-weight: 800; color: #2D2D2D; text-transform: uppercase; letter-spacing: 0.1em;">DailyBread AR Loading...</p>
+    </div>
+
+    <div id="ui">
+      <div class="badge">Point camera at HIRO marker</div>
+    </div>
+
+    <a-scene 
+      embedded 
+      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+      renderer="logarithmicDepthBuffer: true; colorManagement: true;"
+      vr-mode-ui="enabled: false"
+    >
+      <a-assets>
+        <a-asset-item id="shawarma-model" src="https://github.com/lou-sys499/dailybread_shawarma_webar/raw/refs/heads/main/sample-shawarma.glb"></a-asset-item>
+      </a-assets>
+
+      <!-- Hiro Marker -->
+      <a-marker preset="hiro" id="hiro-marker">
+        <a-entity
+          id="shawarma-entity"
+          gltf-model="#shawarma-model"
+          position="0 0 0"
+          scale="0.5 0.5 0.5"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear"
+          animation__scale="property: scale; from: 0.45 0.45 0.45; to: 0.55 0.55 0.55; dir: alternate; loop: true; dur: 2000; easing: easeInOutQuad"
+        ></a-entity>
+      </a-marker>
+
+      <!-- Basic Lighting -->
+      <a-entity light="type: ambient; color: #BBB; intensity: 1"></a-entity>
+      <a-entity light="type: directional; color: #FFF; intensity: 0.8" position="-1 1 1"></a-entity>
+
+      <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+      window.addEventListener('load', () => {
+        const loader = document.getElementById('loader');
+        const entity = document.getElementById('shawarma-entity');
+        
+        entity.addEventListener('model-loaded', () => {
+          setTimeout(() => {
+            loader.style.opacity = '0';
+            setTimeout(() => {
+              loader.style.display = 'none';
+            }, 500);
+          }, 1000);
+        });
+
+        // Error handling for model
+        entity.addEventListener('model-error', (e) => {
+          console.error("Model Error:", e);
+          document.querySelector('#loader p').textContent = "Connection Error. Check Model URL.";
+        });
+      });
+    </script>
+  </body>
+</html>

@@ -117,6 +117,13 @@ export default function ARPage() {
                       <Scan className="w-4 h-4 lg:w-5 lg:h-5 mr-3" />
                       START AR
                     </ARButton>
+                    <a 
+                      href="/ar.html"
+                      className="flex-1 btn-glass !py-4 lg:!py-5 uppercase tracking-[0.2em] text-[10px] lg:text-xs font-black flex items-center justify-center !text-[#FF6B35] !border-[#FF6B35]/20"
+                    >
+                      <Scan className="w-4 h-4 lg:w-5 lg:h-5 mr-3" />
+                      MARKER MODE
+                    </a>
                     <div className="hidden sm:flex lg:hidden flex-col items-center justify-center flex-1">
                         <span className="text-[9px] font-bold uppercase tracking-widest text-[#FF6B35] animate-pulse">Scanning Ready</span>
                         <span className="text-[8px] text-gray-400 uppercase tracking-tighter text-center">Table calibration active</span>
@@ -127,7 +134,8 @@ export default function ARPage() {
                 <div className="flex flex-col items-center justify-center py-6 lg:py-12 text-center">
                     <Scan className="w-12 lg:w-16 h-12 lg:h-16 text-[#FF6B35] opacity-20 mb-4 lg:mb-6 animate-pulse" />
                     <h3 className="text-xl lg:text-2xl font-black uppercase tracking-tighter text-[#2D2D2D]">Universal Viewer</h3>
-                    <ARButton store={store} className="mt-6 lg:mt-8 btn-primary !py-4 w-full uppercase text-[10px] tracking-widest">START SCANNING</ARButton>
+                    <ARButton store={store} className="mt-6 lg:mt-8 btn-primary !py-4 w-full uppercase text-[10px] tracking-widest mb-3">START SCANNING</ARButton>
+                    <a href="/ar.html" className="btn-glass !py-4 w-full uppercase text-[10px] tracking-widest text-center !text-[#FF6B35]">USE HIRO MARKER</a>
                 </div>
               )}
             </motion.div>
