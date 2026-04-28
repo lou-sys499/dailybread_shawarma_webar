@@ -26,4 +26,4 @@ export function DishModel({ url, scale = 1, rotation = [0, 0, 0] }: DishModelPro
 // Preload common models
 useGLTF.preload('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb');
 useGLTF.preload('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb');
-useGLTF.preload('https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/sample-shawarma.glb');
+useGLTF.preload('/models/duck.glb');
