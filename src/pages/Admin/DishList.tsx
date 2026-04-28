@@ -17,7 +17,10 @@ export default function DishList() {
         setDishes(dishesList);
         setLoading(false);
       },
-      (error) => handleFirestoreError(error, OperationType.LIST, 'dishes')
+      (error) => {
+        setLoading(false);
+        handleFirestoreError(error, OperationType.LIST, 'dishes');
+      }
     );
     return unsub;
   }, []);

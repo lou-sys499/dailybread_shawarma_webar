@@ -9,7 +9,7 @@ interface DishModelProps {
 }
 
 export function DishModel({ url, scale = 1, rotation = [0, 0, 0] }: DishModelProps) {
-  const { scene } = useGLTF(url);
+  const { scene } = useGLTF(url, 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
   const groupRef = useRef<Group>(null);
 
   return (
@@ -24,6 +24,7 @@ export function DishModel({ url, scale = 1, rotation = [0, 0, 0] }: DishModelPro
 }
 
 // Preload common models
-useGLTF.preload('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb');
-useGLTF.preload('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb');
-useGLTF.preload('/models/duck.glb');
+const DRACO_PATH = 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/';
+useGLTF.preload('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF-Binary/Duck.glb', DRACO_PATH);
+useGLTF.preload('https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb', DRACO_PATH);
+useGLTF.preload('/models/duck.glb', DRACO_PATH);

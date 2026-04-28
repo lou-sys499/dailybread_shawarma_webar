@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <!-- AR.js for A-Frame -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <!-- AR.js for A-Frame (Stable Version) -->
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+    <!-- Draco Decoder for compressed GLBs -->
+    <script src="https://www.gstatic.com/draco/versioned/decoders/1.5.6/draco_decoder.js"></script>
     <style>
-      body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; }
+      body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; background-color: #000; }
       #loader {
         position: fixed;
         top: 0; left: 0; width: 100%; height: 100%;
@@ -79,35 +81,40 @@
     </div>
 
     <div id="ui">
-      <div class="badge">Point camera at HIRO marker</div>
+      <div class="badge" id="status-badge">Searching for Hiro Marker...</div>
     </div>
 
     <a-scene 
       embedded 
-      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
-      renderer="logarithmicDepthBuffer: true; colorManagement: true;"
+      arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; patternRatio: 0.5; trackingMethod: best;"
+      renderer="colorManagement: true; antialias: true; precision: medium;"
       vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+      gltf-model="dracoDecoderPath: https://www.gstatic.com/draco/versioned/decoders/1.5.6/;"
     >
-      <a-assets>
-        <a-asset-item id="shawarma-model" src="/models/duck.glb"></a-asset-item>
-      </a-assets>
+      <a-assets></a-assets>
 
-      <!-- Hiro Marker -->
-      <a-marker preset="hiro" id="hiro-marker">
+      <a-marker 
+        preset="hiro" 
+        id="hiro-marker"
+        smooth="true"
+        smoothCount="5"
+        smoothTolerance="0.01"
+        smoothThreshold="2"
+      >
+        <!-- Very small pivot box to confirm center of marker -->
+        <a-box position="0 0 0" material="color: #FF6B35; opacity: 0.8" scale="0.1 0.1 0.1"></a-box>
+        
         <a-entity
           id="shawarma-entity"
-          gltf-model="#shawarma-model"
-          position="0 0 0"
-          scale="0.5 0.5 0.5"
+          position="0 0.1 0"
+          scale="2 2 2"
           animation="property: rotation; to: 0 360 0; loop: true; dur: 8000; easing: linear"
-          animation__scale="property: scale; from: 0.45 0.45 0.45; to: 0.55 0.55 0.55; dir: alternate; loop: true; dur: 2000; easing: easeInOutQuad"
         ></a-entity>
       </a-marker>
 
-      <!-- Basic Lighting -->
-      <a-entity light="type: ambient; color: #BBB; intensity: 1"></a-entity>
+      <a-entity light="type: ambient; color: #FFF; intensity: 1"></a-entity>
       <a-entity light="type: directional; color: #FFF; intensity: 0.8" position="-1 1 1"></a-entity>
-
       <a-entity camera></a-entity>
     </a-scene>
 
@@ -115,29 +122,93 @@
       window.addEventListener('load', () => {
         const loader = document.getElementById('loader');
         const entity = document.getElementById('shawarma-entity');
-        const modelAsset = document.getElementById('shawarma-model');
+        const dracoPath = 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/';
         
-        // Dynamic Model Loading
         const urlParams = new URLSearchParams(window.location.search);
-        const modelUrl = urlParams.get('model');
-        if (modelUrl) {
-          modelAsset.setAttribute('src', modelUrl);
-        }
+        let modelUrl = urlParams.get('model') || '/models/duck.glb';
+        const fallbackUrl = 'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Duck/glTF-Binary/Duck.glb';
 
-        entity.addEventListener('model-loaded', () => {
-          setTimeout(() => {
-            loader.style.opacity = '0';
-            setTimeout(() => {
-              loader.style.display = 'none';
-            }, 500);
+        console.log("AR Mode Started. Model URL:", modelUrl);
+
+        const marker = document.getElementById('hiro-marker');
+        const statusBadge = document.getElementById('status-badge');
+        const scene = document.querySelector('a-scene');
+
+        scene.addEventListener('loaded', () => {
+          console.log("A-Frame Scene Loaded");
+          // Check for camera stream periodically
+          const checkCamera = setInterval(() => {
+            const video = document.querySelector('video');
+            if (video && video.readyState >= 2) {
+              console.log("Webcam feed active");
+              clearInterval(checkCamera);
+            } else if (video) {
+              console.log("Webcam initializing...");
+            }
           }, 1000);
         });
-
-        // Error handling for model
-        entity.addEventListener('model-error', (e) => {
-          console.error("Model Error:", e);
-          document.querySelector('#loader p').textContent = "Connection Error. Check Model URL.";
+        
+        marker.addEventListener('markerFound', () => {
+          console.log("Hiro Marker Found!");
+          statusBadge.textContent = "Hiro Marker Active";
+          statusBadge.style.background = "#FF6B35";
+          statusBadge.style.color = "white";
         });
+
+        marker.addEventListener('markerLost', () => {
+          console.log("Hiro Marker Lost!");
+          statusBadge.textContent = "Searching for Hiro Marker...";
+          statusBadge.style.background = "rgba(255, 255, 255, 0.9)";
+          statusBadge.style.color = "#FF6B35";
+        });
+
+        function setModel(url) {
+          console.log("Requesting gltf-model from:", url);
+          entity.setAttribute('gltf-model', url);
+        }
+
+        setModel(modelUrl);
+
+        entity.addEventListener('model-loaded', () => {
+          console.log("SUCCESS: GLTF Model loaded from", modelUrl);
+          // Hide feedback cube once model is here
+          const fallbackBox = marker.querySelector('a-box');
+          if (fallbackBox) fallbackBox.setAttribute('visible', 'false');
+          
+          loader.style.opacity = '0';
+          setTimeout(() => {
+            loader.style.display = 'none';
+          }, 500);
+        });
+
+        entity.addEventListener('model-error', (e) => {
+          console.error("CRITICAL: GLTF Model Error for", modelUrl, e);
+          if (modelUrl !== fallbackUrl) {
+            console.warn("Retrying with fallback...");
+            modelUrl = fallbackUrl;
+            setModel(modelUrl);
+          } else {
+            console.error("All models failed.");
+            const p = document.querySelector('#loader p');
+            p.textContent = "Hardware incompatibility detected. please refresh.";
+            p.style.color = "#FF6B35";
+          }
+        });
+
+        // If nothing appears after 15s...
+        setTimeout(() => {
+          if (loader.style.display !== 'none') {
+             const p = document.querySelector('#loader p');
+             p.innerHTML = "Still loading...<br/><span style='font-size: 0.8em; opacity: 0.7;'>Try a different angle or lighting</span>";
+          }
+        }, 15000);
+
+        // If marker not found after 10s of being in scene
+        setTimeout(() => {
+          if (statusBadge.textContent === "Searching for Hiro Marker...") {
+             statusBadge.innerHTML = "Hiro Marker not detected?<br/><span style='font-size: 0.8em; opacity: 0.7;'>Ensure border is black & clear</span>";
+          }
+        }, 10000);
       });
     </script>
   </body>

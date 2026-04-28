@@ -11,8 +11,8 @@ import { motion } from 'motion/react';
 import { ArrowLeft, Scan, Info, AlertTriangle, Flame } from 'lucide-react';
 
 const store = createXRStore({
-  depthSensing: true,
-  hand: true,
+  depthSensing: false,
+  hand: false,
 });
 
 export default function ARPage() {
@@ -60,7 +60,7 @@ export default function ARPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-65px)] overflow-hidden">
-      <div className="flex-1 relative flex flex-col items-stretch overflow-hidden">
+      <div className="flex-1 relative flex flex-col items-stretch lg:overflow-hidden">
         
         {/* Top Info Badge - Hidden on small mobile */}
         <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 hidden sm:flex items-center gap-4">
@@ -70,12 +70,46 @@ export default function ARPage() {
             </div>
         </div>
 
+        {/* 3D View Area - Now positioned at top on mobile */}
+        <div className="flex-[1.2] lg:absolute lg:inset-0 bg-[#FFFDF5] relative z-10">
+          <div className="camera-simulation absolute inset-0 opacity-40 pointer-events-none"></div>
+          <div className="dish-placeholder absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10"></div>
+          <div className="reticle absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
+          
+          <Canvas shadows>
+            <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={50} />
+            <OrbitControls makeDefault enableDamping minDistance={2} maxDistance={10} />
+            <ambientLight intensity={0.5} />
+            <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} decay={0} intensity={Math.PI} />
+            <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
+            
+            <XR store={store}>
+              <Stage intensity={0.5} environment="city" shadows={{ type: 'contact', opacity: 0.2 }}>
+                {(dish || dishId === 'scan') && (
+                  <DishModel 
+                    url={dish?.modelUrl || '/models/duck.glb'} 
+                    scale={1} 
+                  />
+                )}
+              </Stage>
+            </XR>
+            <Environment preset="city" />
+            <gridHelper args={[20, 20, 0x000000, 0x000000]} position={[0, -0.5, 0]} rotation={[0, 0, 0]}>
+                <meshStandardMaterial opacity={0.05} transparent />
+            </gridHelper>
+          </Canvas>
+
+          <div className="absolute bottom-6 right-6 font-mono text-[10px] opacity-20 uppercase tracking-[0.3em] font-black hidden lg:block">
+              Rendering 60FPS Virtual Asset
+          </div>
+        </div>
+
         {/* HUD Panels: Left Info & Right Controls */}
-        <div className="absolute inset-x-0 bottom-0 lg:inset-x-auto lg:top-1/2 lg:left-10 lg:-translate-y-1/2 z-40 p-4 lg:p-0">
+        <div className="relative lg:absolute lg:inset-x-auto lg:top-1/2 lg:left-10 lg:-translate-y-1/2 z-40 p-4 lg:p-0">
             <motion.div 
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              className="w-full lg:w-96 glass-panel p-6 lg:p-10 rounded-[2rem] lg:rounded-[2.5rem] shadow-2xl lg:shadow-none"
+              className="w-full lg:w-96 glass-panel p-5 lg:p-10 rounded-[2rem] lg:rounded-[2.5rem] shadow-2xl lg:shadow-none bg-white/80"
             >
               <div className="flex justify-between items-center lg:block">
                 <Link to="/menu" className="flex items-center gap-2 text-[10px] font-bold text-[#FF6B35] hover:opacity-70 mb-0 lg:mb-8 uppercase tracking-[0.3em] font-sans">
@@ -133,15 +167,15 @@ export default function ARPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-6 lg:py-12 text-center">
-                    <Scan className="w-12 lg:w-16 h-12 lg:h-16 text-[#FF6B35] opacity-20 mb-4 lg:mb-6 animate-pulse" />
-                    <h3 className="text-xl lg:text-2xl font-black uppercase tracking-tighter text-[#2D2D2D]">Universal Viewer</h3>
-                    <ARButton store={store} className="mt-6 lg:mt-8 btn-primary !py-4 w-full uppercase text-[10px] tracking-widest mb-3">START SCANNING</ARButton>
+                <div className="flex flex-col items-center justify-center py-2 lg:py-12 text-center">
+                    <Scan className="w-10 lg:w-16 h-10 lg:h-16 text-[#FF6B35] opacity-20 mb-3 lg:mb-6 animate-pulse" />
+                    <h3 className="text-lg lg:text-2xl font-black uppercase tracking-tighter text-[#2D2D2D]">Universal Viewer</h3>
+                    <ARButton store={store} className="mt-4 lg:mt-8 btn-primary !py-3.5 lg:!py-5 w-full uppercase text-[10px] tracking-widest mb-3">START SCANNING</ARButton>
                     <a 
                       href="/ar.html?model=/models/duck.glb" 
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn-glass !py-4 w-full uppercase text-[10px] tracking-widest text-center !text-[#FF6B35]"
+                      className="btn-glass !py-3.5 w-full uppercase text-[10px] tracking-widest text-center !text-[#FF6B35]"
                     >
                       USE HIRO MARKER
                     </a>
@@ -158,40 +192,6 @@ export default function ARPage() {
             <button className="glass-panel w-10 h-10 lg:w-14 lg:h-14 rounded-xl lg:rounded-2xl flex items-center justify-center text-[#2D2D2D] hover:bg-gray-50 transition-all shadow-xl">
                 <Info className="w-5 h-5 lg:w-6 lg:h-6" />
             </button>
-        </div>
-
-        {/* 3D View Area */}
-        <div className="flex-1 bg-[#FFFDF5] relative z-10">
-          <div className="camera-simulation absolute inset-0 opacity-40 pointer-events-none"></div>
-          <div className="dish-placeholder absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10"></div>
-          <div className="reticle absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
-          
-          <Canvas shadows>
-            <PerspectiveCamera makeDefault position={[0, 0, 5]} fov={50} />
-            <OrbitControls makeDefault enableDamping minDistance={2} maxDistance={10} />
-            <ambientLight intensity={0.5} />
-            <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} decay={0} intensity={Math.PI} />
-            <pointLight position={[-10, -10, -10]} decay={0} intensity={Math.PI} />
-            
-            <XR store={store}>
-              <Stage intensity={0.5} environment="city" shadows={{ type: 'contact', opacity: 0.2 }}>
-                {(dish || dishId === 'scan') && (
-                  <DishModel 
-                    url={dish?.modelUrl || '/models/duck.glb'} 
-                    scale={1} 
-                  />
-                )}
-              </Stage>
-            </XR>
-            <Environment preset="city" />
-            <gridHelper args={[20, 20, 0x000000, 0x000000]} position={[0, -0.5, 0]} rotation={[0, 0, 0]}>
-                <meshStandardMaterial opacity={0.05} transparent />
-            </gridHelper>
-          </Canvas>
-
-          <div className="absolute bottom-6 right-6 font-mono text-[10px] opacity-20 uppercase tracking-[0.3em] font-black hidden lg:block">
-              Rendering 60FPS Virtual Asset
-          </div>
         </div>
       </div>
     </div>

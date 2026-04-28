@@ -45,20 +45,35 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
-        const isAdmin = adminDoc.exists() || firebaseUser.email === 'austinlouisetx@gmail.com';
-        
-        setUser({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || 'Guest',
-          isAdmin: isAdmin
-        });
-      } else {
-        setUser(null);
+      try {
+        if (firebaseUser) {
+          // Check for admin status safely
+          let isAdmin = firebaseUser.email === 'austinlouisetx@gmail.com';
+          
+          try {
+            const adminDoc = await getDoc(doc(db, 'admins', firebaseUser.uid));
+            if (adminDoc.exists()) {
+              isAdmin = true;
+            }
+          } catch (err) {
+            console.error("Firestore connectivity issue:", err);
+            // We fall back to email check if Firestore is unreachable
+          }
+          
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email || '',
+            displayName: firebaseUser.displayName || 'Guest',
+            isAdmin: isAdmin
+          });
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Auth state change error:", error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();

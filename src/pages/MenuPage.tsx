@@ -22,7 +22,10 @@ export default function MenuPage() {
         setDishes(dishesList);
         setLoading(false);
       },
-      (error) => handleFirestoreError(error, OperationType.GET, 'dishes')
+      (error) => {
+        setLoading(false);
+        handleFirestoreError(error, OperationType.GET, 'dishes');
+      }
     );
 
     const unsubCategories = onSnapshot(categoriesRef, 
@@ -30,7 +33,9 @@ export default function MenuPage() {
         const categoriesList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
         setCategories(categoriesList.sort((a, b) => (a.order || 0) - (b.order || 0)));
       },
-      (error) => handleFirestoreError(error, OperationType.GET, 'categories')
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, 'categories');
+      }
     );
 
     return () => {
