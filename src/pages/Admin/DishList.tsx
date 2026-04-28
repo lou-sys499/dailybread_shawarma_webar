@@ -97,15 +97,25 @@ export default function DishList() {
                         </div>
 
                         <div className="flex items-center justify-start lg:justify-end gap-2 lg:opacity-0 group-hover:opacity-100 transition-opacity w-full lg:w-auto pt-4 lg:pt-0 border-t lg:border-t-0 border-gray-50">
-                            <Link to={`/admin/dishes/edit/${dish.id}`} className="p-3 bg-gray-100/50 hover:bg-[#FF6B35] hover:text-white rounded-xl transition-all text-gray-400">
+                            <Link to={`/admin/dishes/edit/${dish.id}`} className="p-3 bg-gray-100/50 hover:bg-[#FF6B35] hover:text-white rounded-xl transition-all text-gray-400" title="Edit">
                                 <Edit2 className="w-4 h-4" />
                             </Link>
-                            <Link to={`/ar/${dish.id}`} className="p-3 bg-gray-100/50 hover:bg-[#FF6B35] hover:text-white rounded-xl transition-all text-gray-400">
+                            <Link to={`/ar/${dish.id}`} className="p-3 bg-gray-100/50 hover:bg-[#FF6B35] hover:text-white rounded-xl transition-all text-gray-400" title="Orbit Preview">
                                 <Eye className="w-4 h-4" />
                             </Link>
+                            <a 
+                                href={`/ar.html?model=${dish.modelUrl}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="p-3 bg-gray-100/50 hover:bg-[#FF6B35] hover:text-white rounded-xl transition-all text-gray-400"
+                                title="Marker AR Mode"
+                            >
+                                <ExternalLink className="w-4 h-4" />
+                            </a>
                             <button 
                                 onClick={() => handleDelete(dish.id)}
                                 className="p-3 bg-red-50 hover:bg-red-500 hover:text-white rounded-xl transition-all text-red-400"
+                                title="Delete"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>

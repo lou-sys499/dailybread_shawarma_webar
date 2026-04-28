@@ -44,9 +44,35 @@
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         display: inline-block;
       }
+      #back-btn {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        background: white;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 15px;
+        font-weight: 900;
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        color: #2D2D2D;
+        text-transform: uppercase;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        z-index: 101;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+      }
     </style>
   </head>
   <body>
+    <a href="/" id="back-btn">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      EXIT AR
+    </a>
+
     <div id="loader">
       <div class="spinner"></div>
       <p style="margin-top: 20px; font-weight: 800; color: #2D2D2D; text-transform: uppercase; letter-spacing: 0.1em;">DailyBread AR Loading...</p>
@@ -63,7 +89,7 @@
       vr-mode-ui="enabled: false"
     >
       <a-assets>
-        <a-asset-item id="shawarma-model" src="https://github.com/lou-sys499/dailybread_shawarma_webar/raw/refs/heads/main/sample-shawarma.glb"></a-asset-item>
+        <a-asset-item id="shawarma-model" src="https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/sample-shawarma.glb"></a-asset-item>
       </a-assets>
 
       <!-- Hiro Marker -->
@@ -89,7 +115,15 @@
       window.addEventListener('load', () => {
         const loader = document.getElementById('loader');
         const entity = document.getElementById('shawarma-entity');
+        const modelAsset = document.getElementById('shawarma-model');
         
+        // Dynamic Model Loading
+        const urlParams = new URLSearchParams(window.location.search);
+        const modelUrl = urlParams.get('model');
+        if (modelUrl) {
+          modelAsset.setAttribute('src', modelUrl);
+        }
+
         entity.addEventListener('model-loaded', () => {
           setTimeout(() => {
             loader.style.opacity = '0';

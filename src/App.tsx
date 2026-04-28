@@ -66,15 +66,15 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#080808]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FFB800]"></div>
+      <div className="h-screen w-screen flex items-center justify-center bg-[#FFFDF5]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF6B35]"></div>
       </div>
     );
   }
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-[#FFFDF5] text-[#2D2D2D] font-sans selection:bg-[#FF6B35] selection:text-white">
+      <div className="min-h-screen bg-[#FFFDF5] text-[#2D2D2D] font-sans selection:bg-[#FF6B35] selection:text-white grain">
         <Navbar user={user} />
         <AnimatedRoutes user={user} />
       </div>
