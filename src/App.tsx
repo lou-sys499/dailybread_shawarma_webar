@@ -109,6 +109,14 @@ export default function App() {
   const [fruitJuiceQty, setFruitJuiceQty] = useState<number>(0);
   const [noteText, setNoteText] = useState<string>('');
 
+  // 3D Model customized fallback states to prevent startup 404 console fetches
+  const defaultModelUrl = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb";
+  const requestedModelUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.glb";
+  const [glbUrl, setGlbUrl] = useState<string>(requestedModelUrl);
+  const [customModelInput, setCustomModelInput] = useState<string>(requestedModelUrl);
+  const [modelLoadError, setModelLoadError] = useState<string | null>(null);
+  const [isUsingCustomModel, setIsUsingCustomModel] = useState<boolean>(true);
+
   // Cart & Orders state
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
@@ -545,8 +553,8 @@ export default function App() {
             <div className="relative bg-stone-50 rounded-2xl shadow-inner border border-stone-200 overflow-hidden aspect-square flex items-center justify-center group isolate">
               
               <model-viewer
-                src="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb"
-                ios-src="https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Avocado/glTF-Binary/Avocado.glb"
+                src={glbUrl}
+                ios-src={glbUrl}
                 alt={`${activeProduct.name} 3D Realistic Model`}
                 auto-rotate
                 camera-controls
@@ -590,8 +598,70 @@ export default function App() {
             
             {/* Disclaimer regarding the 3D specimens */}
             <p className="text-[10px] text-brand-text/60 text-center leading-normal">
-              Disclaimer: The 3D view shows a certified digital avocado specimen representing our fresh-baked vegan toppings. Your actual handcrafted wrap is freshly delivered wrapped in gold foil paper.
+              Disclaimer: While our interactive 3D preview lets you explore the wrap from every angle, nothing beats the real thing! Your fresh, custom-made shawarma will arrive hot, delicious, and hand-wrapped in foil.
             </p>
+
+            {/* 3D Asset Source Configuration Controls */}
+            <div className="bg-stone-50 p-3.5 rounded-xl border border-stone-200 text-left space-y-2 font-sans text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-brand-text text-[11px]">3D Model Asset Mode:</span>
+                <div className="flex bg-stone-200/60 p-0.5 rounded-lg">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setGlbUrl(defaultModelUrl);
+                      setIsUsingCustomModel(false);
+                      setModelLoadError(null);
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${!isUsingCustomModel ? "bg-white text-brand-text shadow-sm" : "text-brand-text/60 hover:text-brand-text"}`}
+                  >
+                    Classic Specimen
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setGlbUrl(customModelInput);
+                      setIsUsingCustomModel(true);
+                      setModelLoadError(null);
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${isUsingCustomModel ? "bg-white text-brand-text shadow-sm" : "text-brand-text/60 hover:text-brand-text"}`}
+                  >
+                    Custom Hosted (Beta)
+                  </button>
+                </div>
+              </div>
+
+              {isUsingCustomModel && (
+                <div className="pt-1.5 space-y-1.5 transition-all">
+                  <div className="flex gap-1.5">
+                    <input 
+                      type="text"
+                      value={customModelInput}
+                      onChange={(e) => setCustomModelInput(e.target.value)}
+                      className="bg-white border border-stone-300 rounded px-2 py-1 text-[10px] font-mono flex-1 text-brand-text focus:outline-none focus:border-brand-primary"
+                      placeholder="https://.../model.glb"
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setGlbUrl(customModelInput);
+                        setModelLoadError(null);
+                      }}
+                      className="bg-brand-primary text-white font-bold text-[10px] px-2.5 py-1 rounded hover:bg-brand-primary/90 transition-all font-ui shrink-0 cursor-pointer"
+                    >
+                      Load
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-brand-text/60 leading-normal">
+                    {modelLoadError ? (
+                      <span className="text-red-500 font-medium">⚠️ Error: {modelLoadError}</span>
+                    ) : (
+                      <span>💡 Preconfigured from user GLB link. Requires a public repo.</span>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Column B: Interactive Food Customization Controls */}
@@ -1397,7 +1467,7 @@ export default function App() {
              <h4 className="font-extrabold text-stone-100 text-xs uppercase tracking-widest mb-1">Help Desk & Hotline</h4>
              {/* Telephone support displayed in footer */}
              <p className="text-stone-200 font-mono text-xs">📞 Tel: {formattedPhoneDisplay}</p>
-             <p className="text-stone-300">✉ Email: contact@dailybreadshawarma.com</p>
+             <p className="text-stone-300">✉ Email: contact@dailybreadshawarma.store</p>
              <p className="text-[10px] text-stone-400 leading-normal">
                Call directly on your mobile device for rapid resolution. Safe, hygienic takeaway packaging standard.
              </p>
