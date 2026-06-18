@@ -140,8 +140,8 @@ export default function App() {
   // Cameroonian support number & physical address details
   const phoneNumber = "+237652351693";
   const formattedPhoneDisplay = "+237 6 52 35 16 93";
-  const addressDisplay = "beside Africa Invest Consulting (Likoko Annex), Buea-Likoko, Buea, Cameroon";
-  const mapsLink = "https://www.google.com/maps/dir/?api=1&destination=Africa+Invest+Consulting+Buea";
+  const addressDisplay = "beside Bishop Store, Bokwaongo Junction, Buea, Cameroon";
+  const mapsLink = "https://maps.app.goo.gl/e1wFCcqxSkREmRnY7";
   
   // Real-time Operating Hours Calculations: Open Tue-Sun 1:00 PM to 10:30 PM
   useEffect(() => {
@@ -246,7 +246,7 @@ export default function App() {
     const unitPrice = baseRate + totalAddons;
     const finalAmount = unitPrice * qty;
 
-    let text = `*New Order: DailyBread Shawarma (Likoko, Buea)*\n\n`;
+    let text = `*New Order: DailyBread Shawarma (Bokwaongo Junction, Buea)*\n\n`;
     text += `Hello, I'd like to place an order for delivery/pickup:\n\n`;
     text += `🍔 *Product:* ${productName}\n`;
     text += `🔢 *Quantity:* ${qty} unit${qty > 1 ? 's' : ''}\n`;
@@ -272,7 +272,7 @@ export default function App() {
 
   // Checkout complete cart items block to WhatsApp API
   const buildCartWhatsAppRequest = () => {
-    let text = `*DailyBread Shawarma Order - Likoko, Buea*\n\n`;
+    let text = `*DailyBread Shawarma Order - Bokwaongo Junction, Buea*\n\n`;
     text += `Hi DailyBread, I want to confirm my checkout order:\n\n`;
 
     cart.forEach((item, idx) => {
@@ -343,9 +343,14 @@ export default function App() {
       <header className="sticky top-0 bg-white/90 backdrop-blur-md z-40 border-b border-brand-text/5 shadow-sm transition-all font-ui">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-             <div className="bg-brand-primary text-white p-2.5 rounded-2xl flex items-center justify-center">
-                 <UtensilsCrossed size={22} strokeWidth={2.5} />
-             </div>
+             <a href="https://imgbb.com/" target="_blank" rel="noreferrer" className="shrink-0 flex items-center justify-center w-11 h-11 rounded-2xl overflow-hidden bg-brand-primary/10">
+                 <img 
+                   src="https://i.ibb.co/8Lf5DQvS/dailybread-shawarma-logo-copy.webp" 
+                   alt="dailybread shawarma logo" 
+                   className="w-full h-full object-cover" 
+                   referrerPolicy="no-referrer"
+                 />
+             </a>
              <div>
                <h1 className="text-xl md:text-2xl font-display font-bold tracking-tight text-brand-primary leading-none">DailyBread</h1>
                <p className="text-[11px] text-brand-text/70 font-ui font-semibold tracking-wider uppercase mt-1">Shawarma & Grill • Buea</p>
@@ -402,7 +407,7 @@ export default function App() {
           </span>
           <span className="hidden sm:inline">|</span>
           <span>Eatery Hours: Tue - Sun (1:00 PM to 10:30 PM). Monday: CLOSED.</span>
-          <span className="font-normal text-[10px] bg-black/5 px-2 py-0.5 rounded-md">Located beside Africa Invest Consulting (Likoko Annex), Buea-Likoko, Buea</span>
+          <span className="font-normal text-[10px] bg-black/5 px-2 py-0.5 rounded-md">Located beside Bishop Store, Bokwaongo Junction, Buea</span>
         </div>
       </div>
 
@@ -423,7 +428,7 @@ export default function App() {
                 Savor the Perfect <span className="text-brand-primary underline decoration-brand-accent-1/30">Shawarma</span> in Buea
               </h1>
               <p className="text-base md:text-lg text-brand-text/80 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-sans">
-                Thinly sliced seasoned beef, fresh organic grown tomatoes and crisp potato fries rolled tightly in freshly grilled Lebanese flatbread. Handcrafted daily <span className="font-bold underline decoration-brand-primary text-brand-primary">beside Africa Invest Consulting (Likoko Annex), Buea-Likoko, 46RG+4VP, Buea, Cameroon</span>.
+                Thinly sliced seasoned beef, fresh organic grown tomatoes and crisp potato fries rolled tightly in freshly grilled Lebanese flatbread. Handcrafted daily <span className="font-bold underline decoration-brand-primary text-brand-primary">beside Bishop Store, Bokwaongo Junction, Buea, Cameroon</span>.
               </p>
             </div>
 
@@ -490,7 +495,7 @@ export default function App() {
           </div>
           <div className="flex items-center justify-center gap-3">
              <div className="bg-brand-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-xs">📍</div>
-             <span>Proudly Serving Buea-Likoko, Molyko, & Great Soppo</span>
+             <span>Proudly Serving Bokwaongo, Molyko, & Great Soppo</span>
           </div>
           <div className="flex items-center justify-center gap-3">
              <div className="bg-brand-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-xs">💬</div>
@@ -869,7 +874,7 @@ export default function App() {
                 { name: "Anniversaries & Romance", desc: "Luxury private couple menu" },
                 { name: "Corporate events", desc: "Clean pre-packaged lunchboxes" },
                 { name: "Private closed events", desc: "Private dynamic grill chef setups" },
-                { name: "Dine-in seating eatery", desc: "Relax and sit with us in Likoko!" }
+                { name: "Dine-in seating eatery", desc: "Relax and sit with us in Bokwaongo!" }
               ].map((service, index) => (
                 <div key={index} className="flex gap-2 bg-white/5 p-3 rounded-xl border border-white/10">
                   <div className="text-brand-accent-1 font-extrabold mt-0.5 text-sm">✓</div>
@@ -1005,7 +1010,7 @@ export default function App() {
                 Baking Fresh Bread and Searing Spiced Beef Every Single Day
               </h2>
               <p className="text-brand-text/80 text-sm md:text-base leading-relaxed font-sans">
-                Founded beside Africa Invest Consulting (Likoko Annex), DailyBread started with a singular golden mission: to elevate shawarma street food in Buea. Combining authentic Lebanese flatbread techniques with freshly crushed habaneros & local Cameroonian hibiscus juice (Zobo), we created an unparalleled food standard.
+                Founded beside Bishop Store, DailyBread started with a singular golden mission: to elevate shawarma street food in Buea. Combining authentic Lebanese flatbread techniques with freshly crushed habaneros & local Cameroonian hibiscus juice (Zobo), we created an unparalleled food standard.
               </p>
               <p className="text-brand-text/80 text-sm leading-relaxed font-sans">
                 We believe that premium food is prepared with complete honesty. That is why our beef rolls are purely lean muscle trimmed manually, spiced overnight, and roasted slowly with zero trans fats. One wrap keeps you full and fueled for the whole day!
@@ -1032,8 +1037,8 @@ export default function App() {
             <div className="space-y-4">
               <div className="bg-brand-primary/5 p-5 rounded-2xl border border-brand-primary/10">
                 <div className="bg-brand-primary text-white rounded-xl w-10 h-10 flex items-center justify-center font-bold text-lg mb-3">📍</div>
-                <h4 className="font-semibold font-heading text-brand-text text-sm">Buea-Likoko</h4>
-                <p className="text-[11px] text-brand-text/70 mt-1 font-sans leading-relaxed">Conveniently situated next to Africa Invest Consulting (Likoko Annex).</p>
+                <h4 className="font-semibold font-heading text-brand-text text-sm">Bokwaongo Junction</h4>
+                <p className="text-[11px] text-brand-text/70 mt-1 font-sans leading-relaxed">Conveniently situated next to Bishop Store.</p>
               </div>
               <div className="bg-brand-text/5 p-5 rounded-2xl border border-brand-text/10">
                 <div className="bg-brand-text text-white rounded-xl w-10 h-10 flex items-center justify-center font-bold text-lg mb-3">🥖</div>
@@ -1071,7 +1076,7 @@ export default function App() {
               Always Warm, Always <span className="text-amber-400">Ready</span> For You
             </h2>
             <p className="text-stone-300 text-sm leading-relaxed">
-              We maintain steady baking shifts to serve you the crispest flatbread possible. Visit our physical Likoko Annex bar or trigger direct home deliveries on our WhatsApp helpline.
+              We maintain steady baking shifts to serve you the crispest flatbread possible. Visit our physical Bokwaongo Junction store or trigger direct home deliveries on our WhatsApp helpline.
             </p>
 
             <div className="space-y-3.5 max-w-md pt-2 font-ui">
@@ -1146,7 +1151,7 @@ export default function App() {
 
               <p className="text-xs text-stone-300 max-w-sm mx-auto font-sans leading-relaxed">
                 {isEateryOpen 
-                  ? "Our grills beside Africa Invest Consulting (Likoko Annex) are active! Order fresh beef/chicken right now on WhatsApp." 
+                  ? "Our grills at Bokwaongo Junction are active! Order fresh beef/chicken right now on WhatsApp." 
                   : "We are currently resting our grills to source fresh ingredients. Our team opens at 1:00 PM."
                 }
               </p>
@@ -1154,7 +1159,7 @@ export default function App() {
               <div className="bg-stone-900/50 p-4 rounded-xl border border-stone-700/50 text-left space-y-2 font-mono">
                  <p className="text-[10px] font-black uppercase text-brand-accent-1 tracking-wider">Fast Contact Reference</p>
                  <p className="text-xs text-stone-200">💬 WhatsApp: {formattedPhoneDisplay}</p>
-                 <p className="text-xs text-stone-200">📍 Location: beside Africa Invest Consulting (Likoko Annex), Buea-Likoko, 46RG+4VP, Buea, Cameroon</p>
+                 <p className="text-xs text-stone-200">📍 Location: beside Bishop Store, Bokwaongo Junction, Buea, Cameroon</p>
               </div>
             </div>
           </div>
@@ -1173,7 +1178,7 @@ export default function App() {
         <div className="grid md:grid-cols-3 gap-6">
           {[
             {
-              quote: "The soft Lebanese bread they grill in Buea is simply outstanding. The meat is spiced overnight, juicy, and never dry! Best shawarma beside Africa Invest Consulting (Likoko Annex).",
+              quote: "The soft Lebanese bread they grill in Buea is simply outstanding. The meat is spiced overnight, juicy, and never dry! Best shawarma near Bokwaongo Junction.",
               author: "Nchouta Divine",
               role: "Local tour guide, Buea",
               rating: 5
@@ -1224,7 +1229,7 @@ export default function App() {
           <div className="lg:col-span-5 space-y-6">
             <div className="inline-flex items-center gap-1.5 bg-brand-primary/10 text-brand-primary px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider font-mono">
               <MapPin size={13} />
-              <span>Buea-Likoko, Buea</span>
+              <span>Bokwaongo Junction, Buea</span>
             </div>
 
             <h2 className="text-3xl md:text-5xl font-bold font-heading text-brand-text tracking-tight leading-none">
@@ -1232,15 +1237,15 @@ export default function App() {
             </h2>
 
             <p className="text-sm text-brand-text/80 leading-relaxed font-sans">
-              We are situated precisely beside <span className="font-bold">Africa Invest Consulting (Likoko Annex), Buea-Likoko, 46RG+4VP, Buea, Cameroon</span>, right next to the pick-up terminal station. Accessible by taxi and motorcycle from all spots.
+              We are situated precisely beside <span className="font-bold">Bishop Store, Bokwaongo Junction, Buea, Cameroon</span>. Accessible by taxi and motorcycle from all spots in Buea.
             </p>
 
             <div className="space-y-4 pt-2">
               <div className="flex gap-3">
                 <div className="w-8 h-8 rounded-lg bg-white shadow flex items-center justify-center shrink-0 border border-stone-100 text-xs">🚗</div>
                 <div>
-                   <h4 className="font-bold text-xs text-brand-text">By Taxi to Buea-Likoko</h4>
-                   <p className="text-[11px] text-brand-text/70 mt-0.5 font-sans">Simply inform the driver you are stopping beside Africa Invest Consulting (Likoko Annex), Buea-Likoko.</p>
+                   <h4 className="font-bold text-xs text-brand-text">By Taxi to Bokwaongo Junction</h4>
+                   <p className="text-[11px] text-brand-text/70 mt-0.5 font-sans">Simply inform the driver you are stopping at Bokwaongo Junction, beside Bishop Store.</p>
                 </div>
               </div>
 
@@ -1248,7 +1253,7 @@ export default function App() {
                 <div className="w-8 h-8 rounded-lg bg-white shadow flex items-center justify-center shrink-0 border border-stone-100 text-xs font-bold text-brand-primary">M</div>
                 <div>
                    <h4 className="font-bold text-xs text-brand-text">By Motorcycle (Okada)</h4>
-                   <p className="text-[11px] text-brand-text/70 mt-0.5 font-sans">Drop right next to Africa Invest Consulting (Likoko Annex).</p>
+                   <p className="text-[11px] text-brand-text/70 mt-0.5 font-sans">Drop right next to Bishop Store around the junction corner.</p>
                 </div>
               </div>
             </div>
@@ -1280,8 +1285,8 @@ export default function App() {
               <div className="h-96 md:h-[450px] w-full rounded-2xl overflow-hidden relative isolate">
                 
                 <iframe 
-                  title="DailyBread Likoko Location Map Pointer"
-                  src="https://maps.google.com/maps?q=Africa%20Invest%20Consulting,%20Buea&t=&z=15&ie=UTF8&iwloc=&output=embed"
+                  title="DailyBread Bokwaongo Junction Location Map"
+                  src="https://maps.google.com/maps?q=Bokwaongo%20Junction,%20Buea&t=&z=16&ie=UTF8&iwloc=&output=embed"
                   className="w-full h-full border-0 rounded-2xl relative z-10" 
                   allowFullScreen={true} 
                   loading="lazy" 
@@ -1292,7 +1297,7 @@ export default function App() {
                 <div className="absolute inset-0 bg-stone-100 flex items-center justify-center -z-10">
                    <div className="text-center space-y-2">
                      <div className="animate-spin w-8 h-8 border-4 border-brand-primary border-t-transparent rounded-full mx-auto"></div>
-                     <p className="text-xs text-brand-text/60 font-sans">Generating Likoko Annex coordinate grid...</p>
+                     <p className="text-xs text-brand-text/60 font-sans">Generating Bokwaongo coordinate grid...</p>
                    </div>
                 </div>
               </div>
@@ -1360,16 +1365,16 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-4 md:px-8 grid md:grid-cols-4 gap-8">
           
           <div className="space-y-3">
-             <h4 className="font-bold font-heading text-white text-base tracking-tight leading-none uppercase">DailyBread</h4>
-             <p className="text-stone-400 text-[11px] leading-relaxed">
+             <h4 className="font-extrabold font-heading text-amber-400 text-sm tracking-widest uppercase mb-1">DailyBread</h4>
+             <p className="text-stone-300 text-[11px] leading-relaxed">
                Crafting premium middle-eastern flavor wraps designed with rich local ingredients in South West Cameroon.
              </p>
-             <p className="text-stone-300 font-bold">📍 beside Africa Invest Consulting (Likoko Annex), Buea-Likoko</p>
+             <p className="text-amber-400 font-bold">📍 beside Bishop Store, Bokwaongo Junction, Buea</p>
           </div>
 
           <div className="space-y-2">
-             <h4 className="font-bold text-white text-xs uppercase tracking-wider">Quick Actions</h4>
-             <ul className="space-y-1.5 text-stone-450">
+             <h4 className="font-extrabold text-stone-100 text-xs uppercase tracking-widest mb-1">Quick Actions</h4>
+             <ul className="space-y-1.5 text-stone-300">
                <li><a href="#menu" className="hover:text-amber-400 transition-colors">Beef Shawarma Customizer</a></li>
                <li><a href="#catering" className="hover:text-amber-400 transition-colors">Event & Catering Services</a></li>
                <li><a href="#about" className="hover:text-amber-400 transition-colors">About DailyBread Studio</a></li>
@@ -1378,21 +1383,21 @@ export default function App() {
           </div>
 
           <div className="space-y-2">
-             <h4 className="font-bold text-white text-xs uppercase tracking-wider">Catering categories</h4>
-             <ul className="space-y-1.5 text-stone-450">
+             <h4 className="font-extrabold text-stone-100 text-xs uppercase tracking-widest mb-1">Catering categories</h4>
+             <ul className="space-y-1.5 text-stone-300">
                <li>• Anniversaries & Romance</li>
                <li>• Birthday celebrations</li>
                <li>• Corporate workshops</li>
                <li>• Family home meals</li>
                <li>• Dine-in seating in Buea</li>
-             </ul>
+              </ul>
           </div>
 
           <div className="space-y-3">
-             <h4 className="font-bold text-white text-xs uppercase tracking-wider">Help Desk & Hotline</h4>
+             <h4 className="font-extrabold text-stone-100 text-xs uppercase tracking-widest mb-1">Help Desk & Hotline</h4>
              {/* Telephone support displayed in footer */}
              <p className="text-stone-200 font-mono text-xs">📞 Tel: {formattedPhoneDisplay}</p>
-             <p className="text-stone-400">✉ Email: contact@dailybreadshawarma.com</p>
+             <p className="text-stone-300">✉ Email: contact@dailybreadshawarma.com</p>
              <p className="text-[10px] text-stone-400 leading-normal">
                Call directly on your mobile device for rapid resolution. Safe, hygienic takeaway packaging standard.
              </p>

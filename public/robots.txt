@@ -1,0 +1,5 @@
+# robots.txt for DailyBread Shawarma Studio
+User-agent: *
+Allow: /
+
+Sitemap: https://dailybreadshawarma.store/sitemap.xml
