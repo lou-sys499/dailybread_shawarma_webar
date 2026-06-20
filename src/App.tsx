@@ -109,8 +109,34 @@ export default function App() {
   const [fruitJuiceQty, setFruitJuiceQty] = useState<number>(0);
   const [noteText, setNoteText] = useState<string>('');
 
-  // 3D Model customized asset URL
-  const glbUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.glb";
+  // 3D Model customized asset state with automatic error fallback
+  const fallbackModelUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
+  const fallbackUsdzUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.usdz";
+  
+  const preferredModelUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.glb";
+  const preferredUsdzUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.usdz";
+
+  const [modelUrl, setModelUrl] = useState<string>(preferredModelUrl);
+  const [usdzUrl, setUsdzUrl] = useState<string>(preferredUsdzUrl);
+  const [glbLoadError, setGlbLoadError] = useState<boolean>(false);
+  const modelViewerRef = React.useRef<any>(null);
+
+  useEffect(() => {
+    const modelViewer = modelViewerRef.current;
+    if (!modelViewer) return;
+
+    const handleError = (event: any) => {
+      console.warn("Model viewer failed to load model, applying fallback:", event);
+      setGlbLoadError(true);
+      setModelUrl(fallbackModelUrl);
+      setUsdzUrl(fallbackUsdzUrl);
+    };
+
+    modelViewer.addEventListener('error', handleError);
+    return () => {
+      modelViewer.removeEventListener('error', handleError);
+    };
+  }, []);
 
   // Cart & Orders state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -548,8 +574,9 @@ export default function App() {
             <div className="relative bg-stone-50 rounded-2xl shadow-inner border border-stone-200 overflow-hidden aspect-square flex items-center justify-center group isolate">
               
               <model-viewer
-                src={glbUrl}
-                ios-src={glbUrl}
+                ref={modelViewerRef}
+                src={modelUrl}
+                ios-src={usdzUrl}
                 alt={`${activeProduct.name} 3D Realistic Model`}
                 auto-rotate
                 camera-controls
@@ -587,6 +614,17 @@ export default function App() {
               {activeProduct.badge && (
                 <div className="absolute top-4 right-4 bg-brand-primary text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md z-10 shadow-sm font-ui">
                   {activeProduct.badge}
+                </div>
+              )}
+
+              {/* Graceful Fallback Warning Banner overlay */}
+              {glbLoadError && (
+                <div className="absolute bottom-4 left-4 right-4 bg-amber-50/95 border border-amber-200 p-2.5 rounded-lg shadow-md z-10 flex items-start gap-2 text-stone-850 animate-fade-in">
+                  <div className="text-base shrink-0">⚠️</div>
+                  <div className="text-[10px] leading-tight font-sans">
+                    <span className="font-bold block text-amber-800">Dynamic Asset Offline</span>
+                    Your custom-hosted GLB file returned a 404 from the CDN repo. We have fallback loaded a certified digital specimen.
+                  </div>
                 </div>
               )}
             </div>

@@ -1,5 +1,38 @@
-# robots.txt for DailyBread Shawarma Studio
+# ==============================================================================
+# robots.txt for DailyBread Shawarma WebAR Storefront
+# Savor Buea's Best Beef & Chicken Shawarmas — Bokwaongo Junction, Cameroon
+# ==============================================================================
+
+# Allow search crawlers and friendly LLM scrapers
 User-agent: *
 Allow: /
+Crawl-delay: 1
 
+# Welcome LLM & AI agents for search/retrieval enhancement
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# Block problematic/aggressive commercial crawlers
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: Rogerbot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+# Sitemap Location
 Sitemap: https://dailybreadshawarma.store/sitemap.xml

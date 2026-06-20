@@ -1,13 +1,26 @@
-# DailyBread Shawarma
+# DailyBread Shawarma Storefront
 
-Vibrant, custom-crafted shawarma, grill, and local catering eatery based in Bokwaongo Junction, Buea, Cameroon.
+A premium, custom-crafted shawarma, grill, and local catering eatery based in Bokwaongo Junction, Buea, Cameroon, featuring state-of-the-art WebAR (Web Augmented Reality) 3D model previews for menu items.
 
-## Main Services
-- **Beef & Chicken Shawarma Customizer**: Online premium ingredient builder (Lebanese pita, overnight-marinaded beef, sweet hibiscus Zobo context).
-- **Fast Delivery Dispatch**: Streamlined order templates routing straight to WhatsApp on +237 652 351 693.
-- **Physical Dine-In & Event Catering**: Sit down or order corporate boards and party boxes in South West region Cameroon.
+## Main Services & Experience
+- **Interactive 3D WebAR Viewer**: Powered by Google `<model-viewer>`, customers can view a high-fidelity 3D model of their shawarma on iOS and Android before ordering (loads certified GLB and USDZ files dynamically).
+- **Interactive Ingredients Builder**: Online ingredient customizer for selecting:
+  - **Wrap Bases**: Overnight-marinated tender beef, fiery spicy chicken, sausage wraps, and custom mixed double meat combinations.
+  - **Fresh Toppings**: Shredded white cabbage, sweet carrots, crunchy green bell peppers, diced onions, and parsley.
+  - **Gourmet Sauces**: Homemade classic garlic cream, sweet yogurt, spicy chili pepper, mustard, and original Cameroonian hot chili paste.
+- **Instant WhatsApp Ordering**: Direct order packaging that constructs a pre-formatted message routing straight to customer checkout on WhatsApp (+237 652 351 693).
+- **Physical Dine-In**: Premium, clean seating experience beside Bishop Store at Bokwaongo Junction.
+- **Event Catering**: Party boxes, Shawarma platters, miniature gourmet wraps, and corporate bite spreads.
 
-## Coordinates
-- **Address**: Beside Bishop Store, Bokwaongo Junction, Buea, South West Region, Cameroon
-- **Google Maps Link**: https://maps.app.goo.gl/e1wFCcqxSkREmRnY7
-- **Hours**: Tuesday to Sunday, 1:00 PM to 10:30 PM (Mondays Closed).
+## Coordinates & Contact Information
+- **Domain**: https://dailybreadshawarma.store/
+- **Physical Address**: Beside Bishop Store, Bokwaongo Junction, Buea, South West Region, Cameroon
+- **Google Maps Navigation**: https://maps.app.goo.gl/e1wFCcqxSkREmRnY7
+- **Business Hours**: Tuesday to Sunday, 1:00 PM to 10:30 PM (Mondays Closed).
+- **Customer Support Phone / WhatsApp**: +237 652 351 693
+- **Primary Spoken Languages**: English, Pidgin English, Cameroonian French
+
+## Core Menu & Specialties
+- **Signature Double Meat Wrap**: Freshly grilled Lebanese pita laden with heavy double beef and spicy shredded chicken layers.
+- **Hibiscus Zobo Wellness Drink**: Local steeped organic hibiscus sabdariffa infused with fresh pineapple, ginger juice, and sweet citrus notes.
+- **Classic Fruit Juice Medley**: Ice-cold physically pressed seasonal local fruits sourced in the South West mountain slopes.
