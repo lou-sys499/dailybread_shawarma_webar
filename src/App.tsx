@@ -113,7 +113,7 @@ export default function App() {
   const fallbackModelUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
   const fallbackUsdzUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.usdz";
   
-  const preferredModelUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.glb";
+  const preferredModelUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/models/3d_shawarma_sample-v1.glb";
   const preferredUsdzUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.usdz";
 
   const [modelUrl, setModelUrl] = useState<string>(preferredModelUrl);
@@ -448,7 +448,7 @@ export default function App() {
           <div className="lg:col-span-7 space-y-6 md:space-y-8 text-center lg:text-left">
             <div className="inline-flex items-center gap-2 bg-orange-100/80 text-orange-950 border border-orange-200 px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider font-ui">
               <Sparkles size={13} className="text-brand-primary animate-spin" />
-              <span>Gourmet Shawarma Hub in Buea</span>
+              <span>Best Shawarma Hub in Buea</span>
             </div>
 
             <div className="space-y-4">
@@ -930,7 +930,7 @@ export default function App() {
             </div>
 
             <div className="bg-stone-900/30 p-4 rounded-xl border border-white/5 text-xs text-stone-300 flex items-center gap-3">
-              <div className="text-2xl font-mono">🔍</div>
+              <div className="text-2xl font-mono">🔥</div>
               <p className="font-sans leading-relaxed">
                 Our chefs grill DailyBread shawarma behind protective glass enclosures, ensuring maximum hygiene. We combine top-quality ingredients with fresh, hand-selected vegetables for a safe, flavorful, and satisfying meal.
               </p>
@@ -1231,12 +1231,6 @@ export default function App() {
               author: "Bessem Clara",
               role: "Student, University of Buea",
               rating: 5
-            },
-            {
-              quote: "Our corporate events team ordered 45 Supreme double-decker party boxes last Tuesday. Clean packaging, robust size, and hot garlic sauce that is spicy but absolutely delicious.",
-              author: "Etonde Hans",
-              role: "Marketing lead, Great Soppo",
-              rating: 5
             }
           ].map((item, index) => (
             <div key={index} className="bg-white p-6 rounded-2xl shadow-sm border border-brand-text/10 flex flex-col justify-between space-y-6">
@@ -1261,6 +1255,34 @@ export default function App() {
               </div>
             </div>
           ))}
+
+          {/* Light-version TikTok Video Opinion */}
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-brand-text/10 flex flex-col justify-between h-full min-h-[350px]">
+            <div className="flex-1 w-full rounded-xl overflow-hidden bg-stone-50 border border-stone-100 relative shadow-inner">
+              <iframe
+                id="tiktok-iframe"
+                src="https://www.tiktok.com/embed/v2/7640124826530680082"
+                className="w-full h-full border-0 rounded-xl animate-fade-in"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                style={{ minHeight: '260px' }}
+                title="DailyBread Shawarma Community Review"
+              />
+            </div>
+            <div className="flex items-center justify-between pt-3 border-t border-stone-100">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded uppercase font-mono animate-pulse">🔥 Video</span>
+                <span className="text-[10px] text-brand-text/60 font-sans font-medium">Customer Love</span>
+              </div>
+              <a 
+                href="https://www.tiktok.com/@whomissb1is/video/7640124826530680082" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[10px] text-brand-primary font-bold hover:underline font-sans flex items-center gap-0.5"
+              >
+                Watch on TikTok ↗
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
