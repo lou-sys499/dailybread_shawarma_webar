@@ -109,32 +109,179 @@ export default function App() {
   const [fruitJuiceQty, setFruitJuiceQty] = useState<number>(0);
   const [noteText, setNoteText] = useState<string>('');
 
-  // 3D Model customized asset state with automatic error fallback
+  // 3D Model customized asset state with automatic error fallback & multi-path matching
   const fallbackModelUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
   const fallbackUsdzUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.usdz";
   
-  const preferredModelUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/models/3d_shawarma_sample-v1.glb";
-  const preferredUsdzUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.usdz";
+  const rootModelUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.glb";
+  const rootUsdzUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.usdz";
 
-  const [modelUrl, setModelUrl] = useState<string>(preferredModelUrl);
-  const [usdzUrl, setUsdzUrl] = useState<string>(preferredUsdzUrl);
+  const subfolderModelUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/models/3d_shawarma_sample-v1.glb";
+  const subfolderUsdzUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/models/3d_shawarma_sample-v1.usdz";
+
+  const [modelUrl, setModelUrl] = useState<string>(rootModelUrl);
+  const [usdzUrl, setUsdzUrl] = useState<string>(rootUsdzUrl);
   const [glbLoadError, setGlbLoadError] = useState<boolean>(false);
   const modelViewerRef = React.useRef<any>(null);
 
+  // Active validation hook to verify asset files exist and pick the working candidate
   useEffect(() => {
-    const modelViewer = modelViewerRef.current;
-    if (!modelViewer) return;
+    let isCancelled = false;
 
-    const handleError = (event: any) => {
-      console.warn("Model viewer failed to load model, applying fallback:", event);
-      setGlbLoadError(true);
-      setModelUrl(fallbackModelUrl);
-      setUsdzUrl(fallbackUsdzUrl);
+    async function validateAndLoadAsset() {
+      const glbCandidates = [rootModelUrl, subfolderModelUrl];
+      const usdzCandidates = [rootUsdzUrl, subfolderUsdzUrl];
+      let workingIndex = -1;
+
+      for (let i = 0; i < glbCandidates.length; i++) {
+        const url = glbCandidates[i];
+        try {
+          // Use fetch (HEAD/GET) to determine physical online existence
+          const response = await fetch(url, { method: 'HEAD' });
+          if (response.ok) {
+            workingIndex = i;
+            break;
+          }
+        } catch (e) {
+          console.warn(`HEAD validation failed for ${url}, trying GET...`);
+          try {
+            const getRes = await fetch(url);
+            if (getRes.ok) {
+              workingIndex = i;
+              break;
+            }
+          } catch (getErr) {
+            console.error(`CORS or connection error checking ${url}:`, getErr);
+          }
+        }
+      }
+
+      if (isCancelled) return;
+
+      if (workingIndex !== -1) {
+        console.log(`Verified working GLB resource at: ${glbCandidates[workingIndex]}`);
+        setModelUrl(glbCandidates[workingIndex]);
+        setUsdzUrl(usdzCandidates[workingIndex]);
+        setGlbLoadError(false);
+      } else {
+        // Double check if we can fetch the root model with static load, otherwise trigger true 404 warning
+        console.warn("Could not verify online status of either custom model URL, checking if root load works in background.");
+        try {
+          const checkRoot = await fetch(rootModelUrl);
+          if (checkRoot.ok && !isCancelled) {
+            setModelUrl(rootModelUrl);
+            setUsdzUrl(rootUsdzUrl);
+            setGlbLoadError(false);
+            return;
+          }
+        } catch (err) {}
+
+        if (!isCancelled) {
+          setGlbLoadError(true);
+          setModelUrl(fallbackModelUrl);
+          setUsdzUrl(fallbackUsdzUrl);
+        }
+      }
+    }
+
+    validateAndLoadAsset();
+
+    // Register 3D model-viewer loading lifecycle errors
+    const modelViewer = modelViewerRef.current;
+    if (modelViewer) {
+      const handleError = (event: any) => {
+        // Only trigger fallback if the model state isn't already pointing to fallback or verified successfully
+        console.warn("Model viewer reported a loading/parsing issue, checking recovery status:", event);
+      };
+      modelViewer.addEventListener('error', handleError);
+      return () => {
+        isCancelled = true;
+        modelViewer.removeEventListener('error', handleError);
+      };
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  // Gyroscope and Accelerometer tilt tracker effect for `<model-viewer>`
+  useEffect(() => {
+    let animationFrameId: number;
+    let targetX = 0; // target roll / yaw deviation (in degrees)
+    let targetY = 0; // target pitch deviation (in degrees)
+    let currentX = 0;
+    let currentY = 0;
+    let fallbackMouseActive = false;
+
+    const handleDeviceOrientation = (event: DeviceOrientationEvent) => {
+      if (event.beta === null || event.gamma === null) return;
+      
+      const beta = event.beta;
+      const gamma = event.gamma;
+
+      // Limit deflection angles to avoid wild spins (max +/- 30 degrees)
+      const clampedGamma = Math.max(-30, Math.min(30, gamma));
+      const clampedBeta = Math.max(-23, Math.min(23, beta));
+
+      // Map to orientation target with a smart handbook typing-offset tilt (Beta held at roughly 50 degs)
+      targetX = clampedGamma * 0.75; 
+      targetY = (clampedBeta - 48) * 0.65;
+      fallbackMouseActive = false;
     };
 
-    modelViewer.addEventListener('error', handleError);
+    // Desktop mouse-movement projection fallback
+    const handleMouseMove = (event: MouseEvent) => {
+      const container = modelViewerRef.current?.parentElement;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const isHoveringViewer = (
+        event.clientX >= rect.left - 150 &&
+        event.clientX <= rect.right + 150 &&
+        event.clientY >= rect.top - 150 &&
+        event.clientY <= rect.bottom + 150
+      );
+
+      if (isHoveringViewer) {
+        fallbackMouseActive = true;
+        const normalizedX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        const normalizedY = ((event.clientY - rect.top) / rect.height) * 2 - 1;
+        
+        targetX = normalizedX * 22; 
+        targetY = -normalizedY * 18; 
+      } else if (fallbackMouseActive) {
+        targetX = 0;
+        targetY = 0;
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('deviceorientation', handleDeviceOrientation, { passive: true });
+      window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    }
+
+    const updateLoop = () => {
+      const modelViewer = modelViewerRef.current;
+      if (modelViewer) {
+        // High-performance smooth butter-interpolation loop
+        currentX += (targetX - currentX) * 0.085;
+        currentY += (targetY - currentY) * 0.085;
+
+        // Apply roll and pitch tilt values directly onto `<model-viewer>`'s orientation attribute
+        modelViewer.setAttribute('orientation', `0deg ${currentY}deg ${currentX}deg`);
+      }
+      animationFrameId = requestAnimationFrame(updateLoop);
+    };
+
+    animationFrameId = requestAnimationFrame(updateLoop);
+
     return () => {
-      modelViewer.removeEventListener('error', handleError);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('deviceorientation', handleDeviceOrientation);
+        window.removeEventListener('mousemove', handleMouseMove);
+      }
+      cancelAnimationFrame(animationFrameId);
     };
   }, []);
 
@@ -609,6 +756,11 @@ export default function App() {
               
               <div className="absolute top-4 left-4 bg-stone-900/80 backdrop-blur-sm text-brand-bg text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-md z-10 font-mono">
                 Interactive Food Specimen
+              </div>
+
+              <div className="absolute bottom-4 left-4 bg-stone-950/80 backdrop-blur-sm text-amber-400 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-md border border-amber-400/20 z-10 font-mono flex items-center gap-1.5 shadow">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-450 animate-ping"></span>
+                <span>3D Gyro/Tilt Active</span>
               </div>
 
               {activeProduct.badge && (
