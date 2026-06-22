@@ -26,11 +26,20 @@
     <meta property="twitter:image" content="https://images.unsplash.com/photo-1529006557810-274b9b2fc783?auto=format&fit=crop&w=1200&h=630&q=80" />
 
     <!-- Meshoptimizer Decoder for compressed 3D GLB/GLTF models -->
-    <script src="https://cdn.jsdelivr.net/npm/meshoptimizer@0.17.0/meshopt_decoder.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/meshoptimizer@0.17.0/meshopt_decoder.js" onload="if (typeof MeshoptDecoder !== 'undefined') { window.MeshoptDecoder = MeshoptDecoder; }"></script>
     <script>
       // Force immediate global assignment for model-viewer auto-detection
       if (typeof MeshoptDecoder !== 'undefined') {
         window.MeshoptDecoder = MeshoptDecoder;
+      } else {
+        // Fallback checks periodically if script hasn't loaded yet
+        var checkMeshopt = setInterval(function() {
+          if (typeof MeshoptDecoder !== 'undefined') {
+            window.MeshoptDecoder = MeshoptDecoder;
+            clearInterval(checkMeshopt);
+          }
+        }, 50);
+        setTimeout(function() { clearInterval(checkMeshopt); }, 5000);
       }
     </script>
 

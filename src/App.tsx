@@ -115,20 +115,12 @@ export default function App() {
   
   const candidates = React.useMemo(() => [
     {
-      glb: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.glb",
-      usdz: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.usdz"
+      glb: "/3d_shawarma_sample-v1.glb",
+      usdz: "/3d_shawarma_sample-v1.usdz"
     },
     {
-      glb: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@master/3d_shawarma_sample-v1.glb",
-      usdz: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@master/3d_shawarma_sample-v1.usdz"
-    },
-    {
-      glb: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/models/3d_shawarma_sample-v1.glb",
-      usdz: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/models/3d_shawarma_sample-v1.usdz"
-    },
-    {
-      glb: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@master/models/3d_shawarma_sample-v1.glb",
-      usdz: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@master/models/3d_shawarma_sample-v1.usdz"
+      glb: "/models/3d_shawarma_sample-v1.glb",
+      usdz: "/models/3d_shawarma_sample-v1.usdz"
     }
   ], []);
 
@@ -147,7 +139,9 @@ export default function App() {
         const win = window as any;
         if (win.MeshoptDecoder) {
           try {
-            await win.MeshoptDecoder.ready;
+            if (win.MeshoptDecoder.ready) {
+              await win.MeshoptDecoder.ready;
+            }
             if (active) {
               console.log("Global MeshoptDecoder is compiled and ready on window.");
               setIsMeshoptReady(true);
@@ -163,25 +157,46 @@ export default function App() {
       const found = await checkAndRegister();
       if (found) return;
 
-      let attempts = 0;
-      const interval = setInterval(async () => {
-        attempts++;
-        const resolved = await checkAndRegister();
-        if (resolved || attempts >= 30) {
-          clearInterval(interval);
-          if (!resolved && active) {
-            console.warn("MeshoptDecoder was not found or failed to initialize. Custom models might fail to decode.");
-            setIsMeshoptReady(true);
-          }
-        }
-      }, 100);
-
-      return () => {
-        active = false;
-        clearInterval(interval);
+      // Dynamically load MeshoptDecoder via script if missing/unassigned
+      const loadScript = () => {
+        return new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://cdn.jsdelivr.net/npm/meshoptimizer@0.17.0/meshopt_decoder.js";
+          script.onload = () => {
+            const win = window as any;
+            if (typeof win.MeshoptDecoder !== "undefined") {
+              win.MeshoptDecoder = win.MeshoptDecoder;
+            }
+            resolve();
+          };
+          script.onerror = () => reject(new Error("MeshoptDecoder script fetch failed."));
+          document.head.appendChild(script);
+        });
       };
+
+      try {
+        await loadScript();
+        await checkAndRegister();
+      } catch (err) {
+        console.error("Error initializing MeshoptDecoder:", err);
+        let attempts = 0;
+        const interval = setInterval(async () => {
+          attempts++;
+          const resolved = await checkAndRegister();
+          if (resolved || attempts >= 30) {
+            clearInterval(interval);
+            if (!resolved && active) {
+              console.warn("MeshoptDecoder was not found or failed to initialize.");
+              setIsMeshoptReady(true);
+            }
+          }
+        }, 100);
+      }
     }
     initMeshopt();
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Set the active GLB source based on candidate validation
