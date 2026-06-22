@@ -6,26 +6,33 @@
     <title>DailyBread Shawarma - Best Lebanese & Cameroonian Shawarma in Buea, Cameroon</title>
     
     <!-- Local SEO Meta Tags -->
-    <meta name="description" content="Savor the best local beef & chicken shawarmas wrapped in toasted Lebanese flatbread in Buea, Cameroon. Enjoy freshly pressed fruit juices and hibiscus Zobo drinks. Experience our menu in realistic 3D WebAR, customize your wraps online, and order directly via WhatsApp for lightning-fast hot food delivery from Bokwaongo Junction!" />
+    <meta name="description" content="Get fresh beef shawarma and Zobo drinks delivered fast from Bokwaongo Junction, Buea. Explore our interactive 3D AR menu and order online now!" />
     <meta name="keywords" content="DailyBread Shawarma, Best Shawarma in Buea, Bokwaongo Junction restaurant, Cameroon street food delivery, beef shawarma Cameroon, chicken shawarma Buea, fast food delivery Buea, order food WhatsApp Buea, Cameroonian zobo drink, fresh fruit juice Buea, food augmented reality WebAR, model-viewer 3D menu, 3d shawarma model, Cameroonian catering services, Buea student deals, dine-in Bokwaongo, Buea local eateries" />
     <link rel="canonical" href="https://dailybreadshawarma.store/" />
     <link rel="icon" type="image/webp" href="https://i.ibb.co/8Lf5DQvS/dailybread-shawarma-logo-copy.webp" />
     
     <!-- Open Graph / Facebook -->
+    <meta name="msvalidate.01" content="BB83CB525C229CDBC351C3EB30620434" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://dailybreadshawarma.store/" />
     <meta property="og:title" content="DailyBread Shawarma - Premium AR Food Experience in Buea" />
-    <meta property="og:description" content="Freshly grilled beef and spicy chicken wraps nestled in soft Lebanese flatbread. View our signature wrap in 3D AR, select compliments, and order instantly over WhatsApp!" />
+    <meta property="og:description" content="Get fresh beef shawarma and Zobo drinks delivered fast from Bokwaongo Junction, Buea. Explore our interactive 3D AR menu and order online now!" />
     <meta property="og:image" content="https://images.unsplash.com/photo-1529006557810-274b9b2fc783?auto=format&fit=crop&w=1200&h=630&q=80" />
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
     <meta property="twitter:title" content="DailyBread Shawarma - Premium AR Food Experience in Buea" />
-    <meta property="twitter:description" content="Savor premium Cameroonian shawarma wraps at Bokwaongo Junction, Buea. Order online via WhatsApp now!" />
+    <meta property="twitter:description" content="Get fresh beef shawarma and Zobo drinks delivered fast from Bokwaongo Junction, Buea. Explore our interactive 3D AR menu and order online now!" />
     <meta property="twitter:image" content="https://images.unsplash.com/photo-1529006557810-274b9b2fc783?auto=format&fit=crop&w=1200&h=630&q=80" />
 
     <!-- Meshoptimizer Decoder for compressed 3D GLB/GLTF models -->
-    <script src="https://unpkg.com/meshoptimizer@0.21.0/meshopt_decoder.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/meshoptimizer@0.17.0/meshopt_decoder.js"></script>
+    <script>
+      // Force immediate global assignment for model-viewer auto-detection
+      if (typeof MeshoptDecoder !== 'undefined') {
+        window.MeshoptDecoder = MeshoptDecoder;
+      }
+    </script>
 
     <!-- Model Viewer for AR 3D Graphics -->
     <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
@@ -36,9 +43,13 @@
         "@context": "https://schema.org",
         "@type": "FoodEstablishment",
         "name": "DailyBread Shawarma",
-        "image": "https://i.ibb.co/8Lf5DQvS/dailybread-shawarma-logo-copy.webp",
+        "image": [
+          "https://i.ibb.co/8Lf5DQvS/dailybread-shawarma-logo-copy.webp",
+          "https://images.unsplash.com/photo-1529006557810-274b9b2fc783?auto=format&fit=crop&w=1200&h=630&q=80"
+        ],
         "@id": "https://dailybreadshawarma.store/#restaurant",
         "url": "https://dailybreadshawarma.store/",
+        "logo": "https://i.ibb.co/8Lf5DQvS/dailybread-shawarma-logo-copy.webp",
         "telephone": "+237652351693",
         "priceRange": "$$",
         "menu": "https://dailybreadshawarma.store/#menu",
@@ -76,7 +87,72 @@
           "telephone": "+237652351693",
           "contactType": "customer service",
           "availableLanguage": ["English", "French"]
-        }
+        },
+        "potentialAction": {
+          "@type": "OrderAction",
+          "target": {
+            "@type": "EntryPoint",
+            "urlTemplate": "https://wa.me/237652351693",
+            "inLanguage": "en",
+            "actionPlatform": [
+              "http://schema.org/DesktopWebPlatform",
+              "http://schema.org/MobileWebPlatform"
+            ]
+          }
+        },
+        "sameAs": [
+          "https://www.tiktok.com/@whomissb1is"
+        ]
+      }
+    </script>
+
+    <!-- FAQPage JSON-LD Structured Data for Local SEO -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Where can I get the best beef shawarma in Buea?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "DailyBread Shawarma, located beside Bishop Store at Bokwaongo Junction, Buea, Cameroon, is widely recognized as serving the best freshly prepared beef shawarma, featuring toasted Lebanese flatbread wrappers filled with premium, juicy local beef cuts."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Do you offer food delivery in Buea?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, we offer fast and secure food delivery services across Buea, Cameroon. Your warm shawarma and chilled signature drinks are packaged hygienically and delivered hot from our Bokwaongo location."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I order through WhatsApp?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Absolutely! You can build and customize your own shawarmas, select beverage quantities, add items to your cart, and place your order directly through WhatsApp for lightning-fast direct delivery dispatch."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Do you serve fresh juices and Zobo drinks?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, we offer authentic home-brewed Cameroonian Zobo (spiced hibiscus syrup drink) and clean, fresh seasonal fruit juices with no added preservatives to perfectly pairing with our rich shawarma wraps."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How can I view your menu?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "You can explore our entire menu directly online here on our web platform. We also feature a realistic, mobile-friendly 3D WebAR menu screen where you can visually inspect ingredients and scale sizes before clicking order."
+            }
+          }
+        ]
       }
     </script>
   </head>

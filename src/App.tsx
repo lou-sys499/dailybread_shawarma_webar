@@ -113,97 +113,122 @@ export default function App() {
   const fallbackModelUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
   const fallbackUsdzUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.usdz";
   
-  const rootModelUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.glb";
-  const rootUsdzUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.usdz";
+  const candidates = React.useMemo(() => [
+    {
+      glb: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.glb",
+      usdz: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-v1.usdz"
+    },
+    {
+      glb: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@master/3d_shawarma_sample-v1.glb",
+      usdz: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@master/3d_shawarma_sample-v1.usdz"
+    },
+    {
+      glb: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/models/3d_shawarma_sample-v1.glb",
+      usdz: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/models/3d_shawarma_sample-v1.usdz"
+    },
+    {
+      glb: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@master/models/3d_shawarma_sample-v1.glb",
+      usdz: "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@master/models/3d_shawarma_sample-v1.usdz"
+    }
+  ], []);
 
-  const subfolderModelUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/models/3d_shawarma_sample-v1.glb";
-  const subfolderUsdzUrl = "https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/models/3d_shawarma_sample-v1.usdz";
-
-  const [modelUrl, setModelUrl] = useState<string>(rootModelUrl);
-  const [usdzUrl, setUsdzUrl] = useState<string>(rootUsdzUrl);
+  const [candidateIndex, setCandidateIndex] = useState<number>(0);
+  const [modelUrl, setModelUrl] = useState<string>(fallbackModelUrl);
+  const [usdzUrl, setUsdzUrl] = useState<string>(fallbackUsdzUrl);
   const [glbLoadError, setGlbLoadError] = useState<boolean>(false);
+  const [isMeshoptReady, setIsMeshoptReady] = useState<boolean>(false);
   const modelViewerRef = React.useRef<any>(null);
 
-  // Active validation hook to verify asset files exist and pick the working candidate
+  // Guarantee MeshoptDecoder is loaded globally and compiled before custom GLB models load
   useEffect(() => {
-    let isCancelled = false;
-
-    async function validateAndLoadAsset() {
-      const glbCandidates = [rootModelUrl, subfolderModelUrl];
-      const usdzCandidates = [rootUsdzUrl, subfolderUsdzUrl];
-      let workingIndex = -1;
-
-      for (let i = 0; i < glbCandidates.length; i++) {
-        const url = glbCandidates[i];
-        try {
-          // Use fetch (HEAD/GET) to determine physical online existence
-          const response = await fetch(url, { method: 'HEAD' });
-          if (response.ok) {
-            workingIndex = i;
-            break;
-          }
-        } catch (e) {
-          console.warn(`HEAD validation failed for ${url}, trying GET...`);
+    let active = true;
+    async function initMeshopt() {
+      const checkAndRegister = async () => {
+        const win = window as any;
+        if (win.MeshoptDecoder) {
           try {
-            const getRes = await fetch(url);
-            if (getRes.ok) {
-              workingIndex = i;
-              break;
+            await win.MeshoptDecoder.ready;
+            if (active) {
+              console.log("Global MeshoptDecoder is compiled and ready on window.");
+              setIsMeshoptReady(true);
             }
-          } catch (getErr) {
-            console.error(`CORS or connection error checking ${url}:`, getErr);
+            return true;
+          } catch (e) {
+            console.error("MeshoptDecoder ready promise error:", e);
           }
         }
-      }
-
-      if (isCancelled) return;
-
-      if (workingIndex !== -1) {
-        console.log(`Verified working GLB resource at: ${glbCandidates[workingIndex]}`);
-        setModelUrl(glbCandidates[workingIndex]);
-        setUsdzUrl(usdzCandidates[workingIndex]);
-        setGlbLoadError(false);
-      } else {
-        // Double check if we can fetch the root model with static load, otherwise trigger true 404 warning
-        console.warn("Could not verify online status of either custom model URL, checking if root load works in background.");
-        try {
-          const checkRoot = await fetch(rootModelUrl);
-          if (checkRoot.ok && !isCancelled) {
-            setModelUrl(rootModelUrl);
-            setUsdzUrl(rootUsdzUrl);
-            setGlbLoadError(false);
-            return;
-          }
-        } catch (err) {}
-
-        if (!isCancelled) {
-          setGlbLoadError(true);
-          setModelUrl(fallbackModelUrl);
-          setUsdzUrl(fallbackUsdzUrl);
-        }
-      }
-    }
-
-    validateAndLoadAsset();
-
-    // Register 3D model-viewer loading lifecycle errors
-    const modelViewer = modelViewerRef.current;
-    if (modelViewer) {
-      const handleError = (event: any) => {
-        // Only trigger fallback if the model state isn't already pointing to fallback or verified successfully
-        console.warn("Model viewer reported a loading/parsing issue, checking recovery status:", event);
+        return false;
       };
-      modelViewer.addEventListener('error', handleError);
+
+      const found = await checkAndRegister();
+      if (found) return;
+
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        const resolved = await checkAndRegister();
+        if (resolved || attempts >= 30) {
+          clearInterval(interval);
+          if (!resolved && active) {
+            console.warn("MeshoptDecoder was not found or failed to initialize. Custom models might fail to decode.");
+            setIsMeshoptReady(true);
+          }
+        }
+      }, 100);
+
       return () => {
-        isCancelled = true;
-        modelViewer.removeEventListener('error', handleError);
+        active = false;
+        clearInterval(interval);
       };
     }
+    initMeshopt();
+  }, []);
+
+  // Set the active GLB source based on candidate validation
+  useEffect(() => {
+    if (!isMeshoptReady) return;
+
+    if (candidateIndex < candidates.length) {
+      console.log(`Loading candidate #${candidateIndex}: ${candidates[candidateIndex].glb}`);
+      setModelUrl(candidates[candidateIndex].glb);
+      setUsdzUrl(candidates[candidateIndex].usdz);
+    } else {
+      console.warn("All candidates exhausted. Gracefully fallback loaded a certified digital specimen.");
+      setGlbLoadError(true);
+      setModelUrl(fallbackModelUrl);
+      setUsdzUrl(fallbackUsdzUrl);
+    }
+  }, [isMeshoptReady, candidateIndex, candidates]);
+
+  // Model loading and recovery event listener hook
+  useEffect(() => {
+    const modelViewer = modelViewerRef.current;
+    if (!modelViewer) return;
+
+    const handleError = (event: any) => {
+      console.warn(`Model-viewer reported a loading/parsing issue on candidate #${candidateIndex}:`, modelUrl, event);
+      if (modelUrl !== fallbackModelUrl) {
+        setCandidateIndex(prev => prev + 1);
+      } else {
+        setGlbLoadError(true);
+      }
+    };
+
+    const handleLoad = () => {
+      if (modelUrl !== fallbackModelUrl) {
+        console.log("3D Custom Model loaded successfully:", modelUrl);
+        setGlbLoadError(false);
+      }
+    };
+
+    modelViewer.addEventListener('error', handleError);
+    modelViewer.addEventListener('load', handleLoad);
 
     return () => {
-      isCancelled = true;
+      modelViewer.removeEventListener('error', handleError);
+      modelViewer.removeEventListener('load', handleLoad);
     };
-  }, []);
+  }, [modelUrl, candidateIndex]);
 
   // Gyroscope and Accelerometer tilt tracker effect for `<model-viewer>`
   useEffect(() => {
@@ -528,7 +553,7 @@ export default function App() {
                  />
              </a>
              <div>
-               <h1 className="text-xl md:text-2xl font-display font-bold tracking-tight text-brand-primary leading-none">DailyBread</h1>
+               <div className="text-xl md:text-2xl font-display font-bold tracking-tight text-brand-primary leading-none">DailyBread</div>
                <p className="text-[11px] text-brand-text/70 font-ui font-semibold tracking-wider uppercase mt-1">Shawarma & Grill • Buea</p>
              </div>
           </div>
@@ -599,10 +624,11 @@ export default function App() {
             </div>
 
             <div className="space-y-4">
+              <h1 className="sr-only">Best Shawarma in Buea, Cameroon | Lebanese & Cameroonian Shawarma at DailyBread Shawarma</h1>
               <div className="tagline text-base sm:text-lg md:text-3xl font-bold text-brand-primary lowercase tracking-wider mb-2">vibrant • handcrafted • authentic</div>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold font-heading tracking-tight text-brand-text leading-none">
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold font-heading tracking-tight text-brand-text leading-none">
                 Savor the Perfect <span className="text-brand-primary underline decoration-brand-accent-1/30">Shawarma</span> in Buea
-              </h1>
+              </h2>
               <p className="text-base md:text-lg text-brand-text/80 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-sans">
                 Thinly sliced seasoned beef, fresh organic grown tomatoes and crisp potato fries rolled tightly in freshly grilled Lebanese flatbread. Handcrafted daily <span className="font-bold underline decoration-brand-primary text-brand-primary">beside Bishop Store, Bokwaongo Junction, Buea, Cameroon</span>.
               </p>
@@ -1574,6 +1600,77 @@ export default function App() {
           <p className="text-[10px] text-stone-400 font-sans">
             For walk-ins, we have secure motorcycle parking and highly hygienic handwashing counters.
           </p>
+        </div>
+      </section>
+
+      {/* 9.5. FAQ Section (SEO FAQ Optimize Block) */}
+      <section className="bg-white py-16 md:py-24 border-t border-brand-text/5 font-sans" id="faq">
+        <div className="max-w-4xl mx-auto px-4 md:px-8">
+          <div className="text-center space-y-3 mb-12">
+            <div className="inline-flex items-center gap-2 bg-brand-primary/10 text-brand-primary border border-brand-primary/25 px-3.5 py-1.5 rounded-full text-xs font-black uppercase tracking-wider font-ui">
+              <span>Got Questions?</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-extrabold font-heading text-brand-text tracking-tight">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-brand-text/70 max-w-xl mx-auto text-sm leading-relaxed">
+              Find fast answers to common questions about our freshly made shawarma wraps, quick home delivery in Buea, dynamic WhatsApp orders, and Zobo juices.
+            </p>
+          </div>
+
+          <div className="space-y-4 font-ui">
+            
+            <div className="bg-stone-50 border border-brand-text/5 rounded-2xl p-6 transition-all hover:shadow-md">
+              <h3 className="text-base font-bold text-brand-text flex items-start gap-3">
+                <span className="text-brand-primary font-mono font-bold shrink-0">01.</span>
+                <span>Where can I get the best beef shawarma in Buea?</span>
+              </h3>
+              <p className="mt-2 text-sm text-brand-text/75 pl-8 leading-relaxed font-sans">
+                You can get the best freshly prepared beef shawarma right at <strong className="text-brand-primary">DailyBread Shawarma</strong>, located beside Bishop Store at Bokwaongo Junction, Buea, Cameroon. We slow-grill premium cuts of beef and roll them with organic ingredients inside clean toasted Lebanese flatbread.
+              </p>
+            </div>
+
+            <div className="bg-stone-50 border border-brand-text/5 rounded-2xl p-6 transition-all hover:shadow-md">
+              <h3 className="text-base font-bold text-brand-text flex items-start gap-3">
+                <span className="text-brand-primary font-mono font-bold shrink-0">02.</span>
+                <span>Do you offer food delivery in Buea?</span>
+              </h3>
+              <p className="mt-2 text-sm text-brand-text/75 pl-8 leading-relaxed font-sans">
+                Yes, we offer fast food delivery across major areas in Buea, Cameroon. Your warm shawarma rolls and signature chilled beverages are packaged in highly hygienic wrap containers and dispatched immediately from Bokwaongo.
+              </p>
+            </div>
+
+            <div className="bg-stone-50 border border-brand-text/5 rounded-2xl p-6 transition-all hover:shadow-md">
+              <h3 className="text-base font-bold text-brand-text flex items-start gap-3">
+                <span className="text-brand-primary font-mono font-bold shrink-0">03.</span>
+                <span>Can I order through WhatsApp?</span>
+              </h3>
+              <p className="mt-2 text-sm text-brand-text/75 pl-8 leading-relaxed font-sans">
+                Absolutely! Our web platform features an custom interactive order cart. You can build your favorite shawarma, click "Order on WhatsApp", and complete your payment details and delivery coordination through our direct WhatsApp channel.
+              </p>
+            </div>
+
+            <div className="bg-stone-50 border border-brand-text/5 rounded-2xl p-6 transition-all hover:shadow-md">
+              <h3 className="text-base font-bold text-brand-text flex items-start gap-3">
+                <span className="text-brand-primary font-mono font-bold shrink-0">04.</span>
+                <span>Do you serve fresh juices and Zobo drinks?</span>
+              </h3>
+              <p className="mt-2 text-sm text-brand-text/75 pl-8 leading-relaxed font-sans">
+                Yes, we serve home-brewed Cameroonian Zobo drinks (deliciously spiced hibiscus tea syrup) and organic, freshly squeezed seasonal fruit juices with no synthetic additives to pair beautifully with your meal.
+              </p>
+            </div>
+
+            <div className="bg-stone-50 border border-brand-text/5 rounded-2xl p-6 transition-all hover:shadow-md">
+              <h3 className="text-base font-bold text-brand-text flex items-start gap-3">
+                <span className="text-brand-primary font-mono font-bold shrink-0">05.</span>
+                <span>How can I view your menu?</span>
+              </h3>
+              <p className="mt-2 text-sm text-brand-text/75 pl-8 leading-relaxed font-sans">
+                Our dynamic digital menu is listed directly on this page. For an incredible modern preview, you can click on items to view them with our realistic, interactive 3D WebAR graphics screen that helps you see your portion and wrap selections.
+              </p>
+            </div>
+
+          </div>
         </div>
       </section>
 
