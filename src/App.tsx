@@ -568,7 +568,7 @@ export default function App() {
                  />
              </a>
              <div>
-               <div className="text-xl md:text-2xl font-display font-bold tracking-tight text-brand-primary leading-none">DailyBread</div>
+               <div className="text-xl md:text-2xl font-heading font-extrabold tracking-tight text-brand-primary leading-none">DailyBread</div>
                <p className="text-[11px] text-brand-text/70 font-ui font-semibold tracking-wider uppercase mt-1">Shawarma & Grill • Buea</p>
              </div>
           </div>
@@ -1580,45 +1580,7 @@ export default function App() {
         </div>
       </section>
 
-      {/* 9. Contact & Click-To-Call Support Block */}
-      <section className="bg-[#0a0a0c] text-white py-16 md:py-20 border-t border-stone-900 font-ui">
-        <div className="max-w-4xl mx-auto px-4 text-center space-y-6">
-          <div className="mx-auto w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-amber-400">
-             <Phone size={24} />
-          </div>
-          
-          <h2 className="text-3xl md:text-5xl font-bold font-heading text-white tracking-tight">Need Support or Party Booking?</h2>
-          <p className="text-stone-200 max-w-lg mx-auto text-sm leading-relaxed font-sans">
-            Our local support call operators are active Mon - Sat to handle customized meal counts, fast delivery routing, or catering package adjustments.
-          </p>
-
-          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-2">
-            {/* Click-to-call Customer Support Phone link */}
-            <a 
-              href={`tel:${phoneNumber}`} 
-              className="w-full sm:w-auto bg-brand-accent-1 hover:bg-brand-primary text-brand-text hover:text-white font-bold px-8 py-4 rounded-xl shadow-lg shadow-brand-accent-1/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-3 text-base cursor-pointer"
-            >
-              <Phone size={18} strokeWidth={2.5} />
-              <span>Call Us: {formattedPhoneDisplay}</span>
-            </a>
-            
-            <a 
-              href={`https://wa.me/237652351693`} 
-              target="_blank" 
-              rel="noreferrer"
-              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold px-8 py-4 rounded-xl shadow-lg transition-all hover:-translate-y-0.5 flex items-center justify-center gap-3 text-base cursor-pointer"
-            >
-              <span>Quick WhatsApp chat</span>
-            </a>
-          </div>
-
-          <p className="text-[10px] text-stone-400 font-sans">
-            For walk-ins, we have secure motorcycle parking and highly hygienic handwashing counters.
-          </p>
-        </div>
-      </section>
-
-      {/* 9.5. FAQ Section (SEO FAQ Optimize Block) */}
+      {/* 9. FAQ Section (SEO FAQ Optimize Block) */}
       <section className="bg-white py-16 md:py-24 border-t border-brand-text/5 font-sans" id="faq">
         <div className="max-w-4xl mx-auto px-4 md:px-8">
           <div className="text-center space-y-3 mb-12">
@@ -1686,6 +1648,44 @@ export default function App() {
             </div>
 
           </div>
+        </div>
+      </section>
+
+      {/* 9.5. Contact & Click-To-Call Support Block */}
+      <section className="bg-[#0a0a0c] text-white py-16 md:py-20 border-t border-stone-900 font-ui">
+        <div className="max-w-4xl mx-auto px-4 text-center space-y-6">
+          <div className="mx-auto w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-amber-400">
+             <Phone size={24} />
+          </div>
+          
+          <h2 className="text-3xl md:text-5xl font-bold font-heading text-white tracking-tight">Need Support or Party Booking?</h2>
+          <p className="text-stone-200 max-w-lg mx-auto text-sm leading-relaxed font-sans">
+            Our local support call operators are active Tue - Sun to handle customized meal counts, fast delivery routing, or catering package adjustments.
+          </p>
+
+          <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-2">
+            {/* Click-to-call Customer Support Phone link */}
+            <a 
+              href={`tel:${phoneNumber}`} 
+              className="w-full sm:w-auto bg-brand-accent-1 hover:bg-brand-primary text-brand-text hover:text-white font-bold px-8 py-4 rounded-xl shadow-lg shadow-brand-accent-1/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-3 text-base cursor-pointer"
+            >
+              <Phone size={18} strokeWidth={2.5} />
+              <span>Call Us: {formattedPhoneDisplay}</span>
+            </a>
+            
+            <a 
+              href={`https://wa.me/237652351693`} 
+              target="_blank" 
+              rel="noreferrer"
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold px-8 py-4 rounded-xl shadow-lg transition-all hover:-translate-y-0.5 flex items-center justify-center gap-3 text-base cursor-pointer"
+            >
+              <span>Quick WhatsApp chat</span>
+            </a>
+          </div>
+
+          <p className="text-[10px] text-stone-400 font-sans">
+            For walk-ins, we have secure motorcycle parking and highly hygienic handwashing counters.
+          </p>
         </div>
       </section>
 
