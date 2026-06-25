@@ -563,7 +563,7 @@ export default function App() {
       <header className="sticky top-0 bg-white/90 backdrop-blur-md z-40 border-b border-brand-text/5 shadow-sm transition-all font-ui">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-             <a href="https://imgbb.com/" target="_blank" rel="noreferrer" className="shrink-0 flex items-center justify-center w-11 h-11 rounded-2xl overflow-hidden bg-brand-primary/10">
+             <a href="/" className="shrink-0 flex items-center justify-center w-11 h-11 rounded-2xl overflow-hidden bg-brand-primary/10">
                  <img 
                    src="https://i.ibb.co/8Lf5DQvS/dailybread-shawarma-logo-copy.webp" 
                    alt="dailybread shawarma logo" 
