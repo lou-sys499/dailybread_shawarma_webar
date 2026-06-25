@@ -23,8 +23,15 @@ import {
   UtensilsCrossed 
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
+import { MeshoptDecoder } from 'meshoptimizer';
 import { ThreeDPhotoEffect } from './components/ThreeDPhotoEffect';
 import './types';
+
+// Bind MeshoptDecoder globally immediately so that <model-viewer> internal THREE.GLTFLoader auto-detects it.
+if (typeof window !== 'undefined') {
+  (window as any).MeshoptDecoder = MeshoptDecoder;
+  (self as any).MeshoptDecoder = MeshoptDecoder;
+}
 
 // Structured Product Data
 interface Product {
@@ -113,16 +120,19 @@ export default function App() {
   const fallbackModelUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
   const fallbackUsdzUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.usdz";
   
-  const candidates = React.useMemo(() => [
-    {
-      glb: "/3d_shawarma_sample-v1.glb",
-      usdz: "/3d_shawarma_sample-v1.usdz"
-    },
-    {
-      glb: "/models/3d_shawarma_sample-v1.glb",
-      usdz: "/models/3d_shawarma_sample-v1.usdz"
-    }
-  ], []);
+  const candidates = React.useMemo(() => {
+    const buster = Date.now();
+    return [
+      {
+        glb: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@v1.0.0.0/models/3d_shawarma_sample-v1.glb?t=${buster}`,
+        usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@v1.0.0.0/models/3d_shawarma_sample-v1.usdz?t=${buster}`
+      },
+      {
+        glb: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/models/3d_shawarma_sample-v1.glb?t=${buster}`,
+        usdz: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/models/3d_shawarma_sample-v1.usdz?t=${buster}`
+      }
+    ];
+  }, []);
 
   const [candidateIndex, setCandidateIndex] = useState<number>(0);
   const [modelUrl, setModelUrl] = useState<string>(fallbackModelUrl);
@@ -134,68 +144,58 @@ export default function App() {
   // Guarantee MeshoptDecoder is loaded globally and compiled before custom GLB models load
   useEffect(() => {
     let active = true;
+    let intervalId: any = null;
+
     async function initMeshopt() {
-      const checkAndRegister = async () => {
-        const win = window as any;
+      const win = window as any;
+      let attempts = 0;
+      const maxAttempts = 50; // Wait up to 5 seconds
+
+      const checkDecoder = async (): Promise<boolean> => {
         if (win.MeshoptDecoder) {
           try {
             if (win.MeshoptDecoder.ready) {
               await win.MeshoptDecoder.ready;
             }
             if (active) {
-              console.log("Global MeshoptDecoder is compiled and ready on window.");
+              console.log("Global MeshoptDecoder is fully compiled, ready, and active.");
               setIsMeshoptReady(true);
             }
             return true;
           } catch (e) {
             console.error("MeshoptDecoder ready promise error:", e);
+            if (active) setIsMeshoptReady(true);
+            return true;
           }
         }
         return false;
       };
 
-      const found = await checkAndRegister();
+      // Check immediately
+      const found = await checkDecoder();
       if (found) return;
 
-      // Dynamically load MeshoptDecoder via script if missing/unassigned
-      const loadScript = () => {
-        return new Promise<void>((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = "https://cdn.jsdelivr.net/npm/meshoptimizer@0.17.0/meshopt_decoder.js";
-          script.onload = () => {
-            const win = window as any;
-            if (typeof win.MeshoptDecoder !== "undefined") {
-              win.MeshoptDecoder = win.MeshoptDecoder;
-            }
-            resolve();
-          };
-          script.onerror = () => reject(new Error("MeshoptDecoder script fetch failed."));
-          document.head.appendChild(script);
-        });
-      };
-
-      try {
-        await loadScript();
-        await checkAndRegister();
-      } catch (err) {
-        console.error("Error initializing MeshoptDecoder:", err);
-        let attempts = 0;
-        const interval = setInterval(async () => {
-          attempts++;
-          const resolved = await checkAndRegister();
-          if (resolved || attempts >= 30) {
-            clearInterval(interval);
-            if (!resolved && active) {
-              console.warn("MeshoptDecoder was not found or failed to initialize.");
-              setIsMeshoptReady(true);
-            }
+      // Poll periodically if not found yet (waiting for index.html's CDN sequential loader)
+      intervalId = setInterval(async () => {
+        attempts++;
+        const resolved = await checkDecoder();
+        if (resolved || attempts >= maxAttempts) {
+          clearInterval(intervalId);
+          if (!resolved && active) {
+            console.warn("MeshoptDecoder not found after 5s polling, proceeding anyway.");
+            setIsMeshoptReady(true);
           }
-        }, 100);
-      }
+        }
+      }, 100);
     }
+
     initMeshopt();
+
     return () => {
       active = false;
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     };
   }, []);
 
@@ -765,7 +765,7 @@ export default function App() {
                 ref={modelViewerRef}
                 src={modelUrl}
                 ios-src={usdzUrl}
-                alt={`${activeProduct.name} 3D Realistic Model`}
+                alt={activeProduct.id === "signature-beef" ? "DailyBread Premium Grilled Beef Shawarma" : `${activeProduct.name} 3D Realistic Model`}
                 auto-rotate
                 camera-controls
                 ar
