@@ -1,4 +1,18 @@
 {
+  "trailingSlash": true,
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.dailybreadshawarma.store"
+        }
+      ],
+      "destination": "https://dailybreadshawarma.store/:path*",
+      "statusCode": 301
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)\\.glb",

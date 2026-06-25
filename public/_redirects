@@ -1,0 +1,2 @@
+# Enforce non-WWW redirects on Netlify in a single 301 hop
+https://www.dailybreadshawarma.store/*  https://dailybreadshawarma.store/:splat  301!
