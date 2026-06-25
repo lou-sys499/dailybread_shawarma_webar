@@ -124,12 +124,16 @@ export default function App() {
     const buster = Date.now();
     return [
       {
-        glb: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@v1.0.0.0/models/3d_shawarma_sample-v1.glb?t=${buster}`,
-        usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@v1.0.0.0/models/3d_shawarma_sample-v1.usdz?t=${buster}`
+        glb: `/3d_shawarma_sample-specimen-v1.glb`,
+        usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
       },
       {
-        glb: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/models/3d_shawarma_sample-v1.glb?t=${buster}`,
-        usdz: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/models/3d_shawarma_sample-v1.usdz?t=${buster}`
+        glb: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.glb?t=${buster}`,
+        usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
+      },
+      {
+        glb: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/3d_shawarma_sample-specimen-v1.glb?t=${buster}`,
+        usdz: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
       }
     ];
   }, []);

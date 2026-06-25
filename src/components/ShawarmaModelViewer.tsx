@@ -7,7 +7,7 @@ export function ShawarmaModelViewer() {
     <div style={{ width: '100%', height: '500px', background: '#f5f5f4' }} className="rounded-3xl overflow-hidden border border-stone-200">
       {/* Google <model-viewer> pulling directly from raw GitHub data stream */}
       <model-viewer
-        src={`https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@v1.0.0.0/models/3d_shawarma_sample-v1.glb?t=${buster}`}
+        src={`https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.glb?t=${buster}`}
         alt="DailyBread Premium Grilled Beef Shawarma Wrap"
         ar
         ar-modes="webxr scene-viewer quick-look"
