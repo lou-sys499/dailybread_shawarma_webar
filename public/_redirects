@@ -1,5 +1,5 @@
 # Serve assets directly on the current host to prevent CORS redirection issues
 /assets/*  /assets/:splat  200
 
-# Enforce non-WWW redirects for pages on Netlify in a single 301 hop
-https://www.dailybreadshawarma.store/*  https://dailybreadshawarma.store/:splat  301!
+# Enforce WWW redirects for pages on Netlify in a single 301 hop
+https://dailybreadshawarma.store/*  https://www.dailybreadshawarma.store/:splat  301!

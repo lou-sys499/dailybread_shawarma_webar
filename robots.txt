@@ -35,4 +35,4 @@ User-agent: SemrushBot
 Disallow: /
 
 # Sitemap Location
-Sitemap: https://dailybreadshawarma.store/sitemap.xml
+Sitemap: https://www.dailybreadshawarma.store/sitemap.xml
