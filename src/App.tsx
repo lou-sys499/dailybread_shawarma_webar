@@ -23,14 +23,16 @@ import {
   UtensilsCrossed 
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
-import { MeshoptDecoder } from 'meshoptimizer';
 import { ThreeDPhotoEffect } from './components/ThreeDPhotoEffect';
 import './types';
 
 // Bind MeshoptDecoder globally immediately so that <model-viewer> internal THREE.GLTFLoader auto-detects it.
 if (typeof window !== 'undefined') {
-  (window as any).MeshoptDecoder = MeshoptDecoder;
-  (self as any).MeshoptDecoder = MeshoptDecoder;
+  if (!(window as any).MeshoptDecoder && (self as any).MeshoptDecoder) {
+    (window as any).MeshoptDecoder = (self as any).MeshoptDecoder;
+  } else if ((window as any).MeshoptDecoder && !(self as any).MeshoptDecoder) {
+    (self as any).MeshoptDecoder = (window as any).MeshoptDecoder;
+  }
 }
 
 // Structured Product Data
