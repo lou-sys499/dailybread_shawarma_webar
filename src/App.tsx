@@ -1305,7 +1305,7 @@ export default function App() {
       </section>
 
       {/* 6. Opening Hours & Live Status Validation Section */}
-      <section id="hours" className="bg-gradient-to-tr from-stone-900 to-stone-830 text-stone-100 py-16 md:py-20 border-y border-stone-800">
+      <section id="hours" className="bg-gradient-to-tr from-[#080d1e] via-[#0d1631] to-[#1c2e5a] text-stone-100 py-16 md:py-20 border-y border-blue-950/45">
         <div className="max-w-6xl mx-auto px-4 md:px-8 grid lg:grid-cols-12 gap-12 items-center">
           
           {/* Working hours info */}
@@ -1316,12 +1316,12 @@ export default function App() {
             <h2 className="text-3xl md:text-5xl font-black text-white tracking-tight leading-none">
               Always Warm, Always <span className="text-amber-400">Ready</span> For You
             </h2>
-            <p className="text-stone-300 text-sm leading-relaxed">
+            <p className="text-stone-200 text-sm leading-relaxed">
               We maintain steady baking shifts to serve you the crispest flatbread possible. Visit our physical Bokwaongo Junction store or trigger direct home deliveries on our WhatsApp helpline.
             </p>
 
             <div className="space-y-3.5 max-w-md pt-2 font-ui">
-              <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
+              <div className="flex justify-between items-center bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 shadow-lg">
                 <div className="flex items-center gap-2">
                    <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></div>
                    <span className="font-bold text-xs text-stone-200">Tuesday - Sunday (Working)</span>
@@ -1329,7 +1329,7 @@ export default function App() {
                 <span className="font-mono text-xs text-brand-accent-1 font-bold">1:00 PM - 10:30 PM</span>
               </div>
 
-              <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl border border-white/5">
+              <div className="flex justify-between items-center bg-white/5 backdrop-blur-md p-3 rounded-xl border border-white/10 shadow-lg">
                 <div className="flex items-center gap-2">
                    <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
                    <span className="font-bold text-xs text-stone-200">Monday (Off-Day)</span>
@@ -1339,33 +1339,33 @@ export default function App() {
             </div>
 
             {/* Simulated environment state widget */}
-            <div className="bg-stone-900 border border-stone-850 p-4 rounded-xl max-w-sm space-y-2">
+            <div className="bg-white/5 backdrop-blur-md border border-white/10 p-4 rounded-xl max-w-sm space-y-2 shadow-lg">
                <h4 className="text-[10px] uppercase font-black tracking-wider text-stone-300 font-mono">Time-Zone Emulator</h4>
-               <p className="text-xs text-stone-350 font-sans">
+               <p className="text-xs text-stone-300 font-sans">
                  You are currently viewing from your local browser time. Test the dynamic status validator:
                </p>
                <div className="flex flex-wrap gap-1.5 pt-1 font-ui">
                  <button 
                    onClick={() => setSimulatedHour(12)} 
-                   className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${simulatedHour === 12 ? 'bg-brand-accent-1 text-brand-text' : 'bg-stone-800 hover:bg-stone-700'}`}
+                   className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${simulatedHour === 12 ? 'bg-brand-accent-1 text-brand-text' : 'bg-white/10 hover:bg-white/15'}`}
                  >
                    ☀️ Set Lunch (12 PM)
                  </button>
                  <button 
                    onClick={() => setSimulatedHour(19)} 
-                   className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${simulatedHour === 19 ? 'bg-brand-accent-1 text-brand-text' : 'bg-stone-800 hover:bg-stone-700'}`}
+                   className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${simulatedHour === 19 ? 'bg-brand-accent-1 text-brand-text' : 'bg-white/10 hover:bg-white/15'}`}
                  >
                    🌙 Set Dinner (7 PM)
                  </button>
                  <button 
                    onClick={() => setSimulatedHour(23)} 
-                   className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${simulatedHour === 23 ? 'bg-brand-accent-1 text-brand-text' : 'bg-stone-800 hover:bg-stone-700'}`}
+                   className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${simulatedHour === 23 ? 'bg-brand-accent-1 text-brand-text' : 'bg-white/10 hover:bg-white/15'}`}
                  >
                    💤 Set Night (11 PM)
                  </button>
                  <button 
                    onClick={() => setSimulatedHour(null)} 
-                   className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${simulatedHour === null ? 'bg-stone-750 text-white underline' : 'bg-stone-800 hover:bg-stone-700'}`}
+                   className={`px-3 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${simulatedHour === null ? 'bg-stone-850 text-white underline' : 'bg-white/10 hover:bg-white/15'}`}
                  >
                    🔄 Restore Live Clock
                  </button>
@@ -1375,19 +1375,19 @@ export default function App() {
 
           {/* Quick status display widget */}
           <div className="lg:col-span-6 flex justify-center">
-            <div className="bg-stone-850 border border-stone-800 rounded-3xl p-8 max-w-md w-full space-y-6 text-center text-white relative overflow-hidden">
+            <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-3xl p-8 max-w-md w-full space-y-6 text-center text-white relative overflow-hidden shadow-2xl">
               <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/10 rounded-full blur-xl"></div>
               
-              <div className="inline-flex mx-auto w-16 h-16 bg-stone-900 rounded-full items-center justify-center border border-stone-750 shadow-xl">
+              <div className="inline-flex mx-auto w-16 h-16 bg-white/5 rounded-full items-center justify-center border border-white/10 shadow-xl">
                  <Clock className="text-brand-accent-1" size={28} />
               </div>
 
               <div className="space-y-1">
-                <p className="text-[11px] text-stone-400 font-bold uppercase tracking-widest font-mono">Dynamic Status Indicator</p>
-                <div className="flex items-center justify-center gap-2 font-heading">
-                  <span className={`w-3.5 h-3.5 rounded-full ${isEateryOpen ? "bg-green-500 animate-ping" : "bg-red-500"}`}></span>
-                  <span className="text-2xl font-black">{isEateryOpen ? "OPEN FOR ORDER" : "CLOSED NOW"}</span>
-                </div>
+                 <p className="text-[11px] text-stone-300 font-bold uppercase tracking-widest font-mono">Dynamic Status Indicator</p>
+                 <div className="flex items-center justify-center gap-2 font-heading">
+                    <span className={`w-3.5 h-3.5 rounded-full ${isEateryOpen ? "bg-green-500 animate-ping" : "bg-red-500"}`}></span>
+                    <span className="text-2xl font-black">{isEateryOpen ? "OPEN FOR ORDER" : "CLOSED NOW"}</span>
+                 </div>
               </div>
 
               <p className="text-xs text-stone-300 max-w-sm mx-auto font-sans leading-relaxed">
@@ -1397,7 +1397,7 @@ export default function App() {
                 }
               </p>
 
-              <div className="bg-stone-900/50 p-4 rounded-xl border border-stone-700/50 text-left space-y-2 font-mono">
+              <div className="bg-black/30 backdrop-blur-md p-4 rounded-xl border border-white/10 text-left space-y-2 font-mono shadow-inner">
                  <p className="text-[10px] font-black uppercase text-brand-accent-1 tracking-wider">Fast Contact Reference</p>
                  <p className="text-xs text-stone-200">💬 WhatsApp: {formattedPhoneDisplay}</p>
                  <p className="text-xs text-stone-200">📍 Location: beside Bishop Store, Bokwaongo Junction, Buea, Cameroon</p>
