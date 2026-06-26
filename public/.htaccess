@@ -1,8 +1,9 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # 1. Force non-WWW
+  # 1. Force non-WWW (except for static assets to avoid CORS/origin issues when loaded under www)
   RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+  RewriteCond %{REQUEST_URI} !\.(js|css|gif|jpg|jpeg|png|webp|ico|svg|glb|usdz|woff|woff2|json)$ [NC]
   RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
 
   # 2. Force HTTPS (supporting standard servers & reverse proxies like Cloudflare/flexible SSL)
@@ -14,4 +15,11 @@
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_URI} !(.*)/$
   RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1/ [R=301,L]
+</IfModule>
+
+# Set CORS Header for assets to prevent cross-origin issues across aliases and subdomains
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|gif|jpg|jpeg|png|webp|ico|svg|glb|usdz|woff|woff2|json)$">
+    Header set Access-Control-Allow-Origin "*"
+  </FilesMatch>
 </IfModule>

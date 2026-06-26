@@ -1,0 +1,7 @@
+# Global CORS and caching headers for Netlify and Cloudflare Pages
+/*
+  Access-Control-Allow-Origin: *
+
+/assets/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=31536000, immutable
