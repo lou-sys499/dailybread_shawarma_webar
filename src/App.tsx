@@ -643,11 +643,10 @@ export default function App() {
             </div>
 
             <div className="space-y-4">
-              <h1 className="sr-only">Best Shawarma in Buea, Cameroon | Lebanese & Cameroonian Shawarma at DailyBread Shawarma</h1>
               <div className="tagline text-base sm:text-lg md:text-3xl font-bold text-brand-primary lowercase tracking-wider mb-2">vibrant • handcrafted • authentic</div>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold font-heading tracking-tight text-brand-text leading-none">
-                Savor the Perfect <span className="text-brand-primary underline decoration-brand-accent-1/30">Shawarma</span> in Buea
-              </h2>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold font-heading tracking-tight text-brand-text leading-none">
+                Savor the Best <span className="text-brand-primary underline decoration-brand-accent-1/30">Shawarma</span> in Buea | DailyBread
+              </h1>
               <p className="text-base md:text-lg text-brand-text/80 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-sans">
                 Thinly sliced seasoned beef, fresh organic grown tomatoes and crisp potato fries rolled tightly in freshly grilled Lebanese flatbread. Handcrafted daily <span className="font-bold underline decoration-brand-primary text-brand-primary">beside Bishop Store, Bokwaongo Junction, Buea, Cameroon</span>.
               </p>
