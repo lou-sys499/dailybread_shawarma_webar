@@ -34,36 +34,17 @@
     <meta property="twitter:description" content="Get fresh beef shawarma and premium Zobo drinks delivered fast across Buea, Cameroon. Explore our unique interactive 3D AR menu and order online now!" />
     <meta property="twitter:image" content="https://images.unsplash.com/photo-1529006557810-274b9b2fc783?auto=format&fit=crop&w=1200&h=630&q=80" />
 
-    <!-- Sequential ES Module Loader to prevent Model Viewer race conditions with MeshoptDecoder -->
+    <!-- Meshoptimizer Decoder for compressed 3D GLB/GLTF models -->
     <script type="module">
       import { MeshoptDecoder } from 'https://cdn.jsdelivr.net/npm/meshoptimizer/meshopt_decoder.module.js';
       
       // Bind globally on window and self for THREE.GLTFLoader auto-detection
       window.MeshoptDecoder = MeshoptDecoder;
       self.MeshoptDecoder = MeshoptDecoder;
-      
-      async function loadModelViewer() {
-        try {
-          // Guarantee WebAssembly compilation is 100% complete before importing model-viewer
-          if (MeshoptDecoder.ready) {
-            await MeshoptDecoder.ready;
-          }
-          console.log("Global MeshoptDecoder is fully compiled and active in index.html");
-        } catch (e) {
-          console.error("Failed to compile MeshoptDecoder WASM:", e);
-        }
-        
-        try {
-          // Dynamic import model-viewer AFTER MeshoptDecoder is ready
-          await import('https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js');
-          console.log("model-viewer (v3.5.0) loaded successfully after MeshoptDecoder compilation!");
-        } catch (e) {
-          console.error("Failed to import model-viewer:", e);
-        }
-      }
-      
-      loadModelViewer();
     </script>
+
+    <!-- Model Viewer for AR 3D Graphics (v3.5.0) -->
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
 
     <!-- Schema.org JSON-LD Structured Data for LocalBusiness SEO -->
     <script type="application/ld+json">

@@ -1,13 +1,17 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Force HTTP to HTTPS and non-WWW in one single hop
-  RewriteCond %{HTTPS} off [OR]
-  RewriteCond %{HTTP_HOST} ^www\.dailybreadshawarma\.store$ [NC]
-  RewriteRule ^(.*)$ https://dailybreadshawarma.store/$1 [R=301,L]
+  # 1. Force non-WWW
+  RewriteCond %{HTTP_HOST} ^www\.(.+)$ [NC]
+  RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
 
-  # Force trailing slash on directories / non-files
+  # 2. Force HTTPS (supporting standard servers & reverse proxies like Cloudflare/flexible SSL)
+  RewriteCond %{HTTPS} off
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1 [R=301,L]
+
+  # 3. Force trailing slash on non-file directories/paths
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_URI} !(.*)/$
-  RewriteRule ^(.*)$ https://dailybreadshawarma.store/$1/ [R=301,L]
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}/$1/ [R=301,L]
 </IfModule>
