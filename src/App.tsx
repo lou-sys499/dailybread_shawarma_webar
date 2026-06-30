@@ -124,21 +124,46 @@ export default function App() {
   
   const candidates = React.useMemo(() => {
     const buster = Date.now();
-    return [
-      {
-        glb: `/3d_shawarma_sample-specimen-v1.glb`,
-        usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
-      },
-      {
-        glb: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.glb?t=${buster}`,
-        usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
-      },
-      {
-        glb: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/3d_shawarma_sample-specimen-v1.glb?t=${buster}`,
-        usdz: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
-      }
-    ];
-  }, []);
+    if (activeProduct.id === "crispy-chicken") { // Zobo (Hibiscus Drink)
+      return [
+        {
+          glb: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/public/smoothie.glb?t=${buster}`,
+          usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/public/smoothie.usdz?t=${buster}`
+        },
+        {
+          glb: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/public/smoothie.glb?t=${buster}`,
+          usdz: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/public/smoothie.usdz?t=${buster}`
+        }
+      ];
+    } else if (activeProduct.id === "supreme-double") { // Fresh Fruit Juice
+      return [
+        {
+          glb: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/public/Lemonade.glb?t=${buster}`,
+          usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/public/Lemonade.usdz?t=${buster}`
+        },
+        {
+          glb: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/public/Lemonade.glb?t=${buster}`,
+          usdz: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/public/Lemonade.usdz?t=${buster}`
+        }
+      ];
+    } else {
+      // Default (Shawarma or other)
+      return [
+        {
+          glb: `/3d_shawarma_sample-specimen-v1.glb`,
+          usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
+        },
+        {
+          glb: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.glb?t=${buster}`,
+          usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
+        },
+        {
+          glb: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/3d_shawarma_sample-specimen-v1.glb?t=${buster}`,
+          usdz: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
+        }
+      ];
+    }
+  }, [activeProduct.id]);
 
   const [candidateIndex, setCandidateIndex] = useState<number>(0);
   const [modelUrl, setModelUrl] = useState<string>(fallbackModelUrl);
@@ -426,6 +451,8 @@ export default function App() {
     setZoboQty(0);
     setFruitJuiceQty(0);
     setNoteText('');
+    setCandidateIndex(0);
+    setGlbLoadError(false);
   };
 
   // Add customized item to general cart state
