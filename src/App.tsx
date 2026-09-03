@@ -130,56 +130,9 @@ export default function App() {
   const [fruitJuiceQty, setFruitJuiceQty] = useState<number>(0);
   const [noteText, setNoteText] = useState<string>('');
 
-  // 3D Model customized asset state with automatic error fallback & multi-path matching
-  const fallbackModelUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.glb";
-  const fallbackUsdzUrl = "https://modelviewer.dev/shared-assets/models/Astronaut.usdz";
-  
-  const candidates = React.useMemo(() => {
-    const buster = Date.now();
-    if (activeProduct.id === "crispy-chicken") { // Zobo (Hibiscus Drink)
-      return [
-        {
-          glb: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/public/smoothie.glb?t=${buster}`,
-          usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/public/smoothie.usdz?t=${buster}`
-        },
-        {
-          glb: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/public/smoothie.glb?t=${buster}`,
-          usdz: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/public/smoothie.usdz?t=${buster}`
-        }
-      ];
-    } else if (activeProduct.id === "supreme-double") { // Fresh Fruit Juice
-      return [
-        {
-          glb: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/public/Lemonade.glb?t=${buster}`,
-          usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/public/Lemonade.usdz?t=${buster}`
-        },
-        {
-          glb: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/public/Lemonade.glb?t=${buster}`,
-          usdz: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/public/Lemonade.usdz?t=${buster}`
-        }
-      ];
-    } else {
-      // Default (Shawarma or other)
-      return [
-        {
-          glb: `/3d_shawarma_sample-specimen-v1.glb`,
-          usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
-        },
-        {
-          glb: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.glb?t=${buster}`,
-          usdz: `https://cdn.jsdelivr.net/gh/lou-sys499/dailybread_shawarma_webar@main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
-        },
-        {
-          glb: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/3d_shawarma_sample-specimen-v1.glb?t=${buster}`,
-          usdz: `https://raw.githubusercontent.com/lou-sys499/dailybread_shawarma_webar/main/3d_shawarma_sample-specimen-v1.usdz?t=${buster}`
-        }
-      ];
-    }
-  }, [activeProduct.id]);
-
-  const [candidateIndex, setCandidateIndex] = useState<number>(0);
-  const [modelUrl, setModelUrl] = useState<string>(fallbackModelUrl);
-  const [usdzUrl, setUsdzUrl] = useState<string>(fallbackUsdzUrl);
+  // 3D Model state using authentic local 3D specimen
+  const shawarmaModelUrl = "/3d_shawarma_sample-specimen-v1.glb";
+  const [show3DPreview, setShow3DPreview] = useState<boolean>(true);
   const [glbLoadError, setGlbLoadError] = useState<boolean>(false);
   const [isMeshoptReady, setIsMeshoptReady] = useState<boolean>(false);
   const modelViewerRef = React.useRef<any>(null);
@@ -276,41 +229,19 @@ export default function App() {
     };
   }, []);
 
-  // Set the active GLB source based on candidate validation
-  useEffect(() => {
-    if (!isMeshoptReady) return;
-
-    if (candidateIndex < candidates.length) {
-      console.log(`Loading candidate #${candidateIndex}: ${candidates[candidateIndex].glb}`);
-      setModelUrl(candidates[candidateIndex].glb);
-      setUsdzUrl(candidates[candidateIndex].usdz);
-    } else {
-      console.warn("All candidates exhausted. Gracefully fallback loaded a certified digital specimen.");
-      setGlbLoadError(true);
-      setModelUrl(fallbackModelUrl);
-      setUsdzUrl(fallbackUsdzUrl);
-    }
-  }, [isMeshoptReady, candidateIndex, candidates]);
-
-  // Model loading and recovery event listener hook
+  // Model loading event listener hook for local 3D Shawarma asset
   useEffect(() => {
     const modelViewer = modelViewerRef.current;
     if (!modelViewer) return;
 
     const handleError = (event: any) => {
-      console.warn(`Model-viewer reported a loading/parsing issue on candidate #${candidateIndex}:`, modelUrl, event);
-      if (modelUrl !== fallbackModelUrl) {
-        setCandidateIndex(prev => prev + 1);
-      } else {
-        setGlbLoadError(true);
-      }
+      console.warn("Model-viewer reported a loading/parsing issue on local 3D asset:", event);
+      setGlbLoadError(true);
     };
 
     const handleLoad = () => {
-      if (modelUrl !== fallbackModelUrl) {
-        console.log("3D Custom Model loaded successfully:", modelUrl);
-        setGlbLoadError(false);
-      }
+      console.log("3D Shawarma Model loaded successfully from local asset.");
+      setGlbLoadError(false);
     };
 
     modelViewer.addEventListener('error', handleError);
@@ -320,7 +251,7 @@ export default function App() {
       modelViewer.removeEventListener('error', handleError);
       modelViewer.removeEventListener('load', handleLoad);
     };
-  }, [modelUrl, candidateIndex]);
+  }, [show3DPreview]);
 
   // Gyroscope and Accelerometer tilt tracker effect for `<model-viewer>`
   useEffect(() => {
@@ -497,8 +428,8 @@ export default function App() {
     setZoboQty(0);
     setFruitJuiceQty(0);
     setNoteText('');
-    setCandidateIndex(0);
     setGlbLoadError(false);
+    setShow3DPreview(product.id === "signature-beef");
     logAnalyticsEvent('3d_ar_opened', 'Summer Shawarma Splash', { product_id: product.id, product_name: product.name });
   };
 
@@ -939,62 +870,100 @@ export default function App() {
           <div className="lg:col-span-6 space-y-4">
             <div className="relative bg-stone-50 rounded-2xl shadow-inner border border-stone-200 overflow-hidden aspect-square flex items-center justify-center group isolate">
               
-              <model-viewer
-                ref={modelViewerRef}
-                src={modelUrl}
-                ios-src={usdzUrl}
-                alt={activeProduct.id === "signature-beef" ? "DailyBread Premium Grilled Beef Shawarma" : `${activeProduct.name} 3D Realistic Model`}
-                auto-rotate
-                camera-controls
-                ar
-                ar-modes="webxr scene-viewer quick-look"
-                shadow-intensity="1.2"
-                className="w-full h-full bg-transparent z-0"
-                style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
-              >
-                <div slot="poster" className="absolute inset-0 flex flex-col items-center justify-center bg-stone-50 p-4 text-center">
-                   <img src={activeProduct.image} alt={activeProduct.name} className="w-full h-full object-cover absolute inset-0 opacity-70" referrerPolicy="no-referrer" />
-                   <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col justify-center items-center p-6 text-white text-center">
-                     <div className="animate-pulse w-14 h-14 bg-brand-accent-1 rounded-full flex items-center justify-center mb-2">
-                       <Sparkles size={24} />
-                     </div>
-                     <span className="font-bold text-sm">3D AR visual mode ready</span>
-                     <span className="text-[10px] text-stone-250 mt-1 max-w-xs">Drag inside the box to rotate or tap view in AR to project inside your room!</span>
-                   </div>
-                </div>
-                
-                {/* Custom AR Button slot */}
-                <button
-                  slot="ar-button"
-                  className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white text-brand-text px-6 py-3 rounded-full font-black shadow-xl border border-stone-200 flex items-center gap-2 hover:bg-brand-bg transition-all transform hover:scale-105 active:scale-95 cursor-pointer z-20 text-xs font-ui"
-                >
-                  <View size={16} className="text-brand-primary" />
-                  <span>PROJECT AR VIEW</span>
-                </button>
-              </model-viewer>
-              
-              <div className="absolute top-4 left-4 bg-stone-900/80 backdrop-blur-sm text-brand-bg text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-md z-10 font-mono">
-                Interactive Food Specimen
-              </div>
+              {show3DPreview ? (
+                <>
+                  <model-viewer
+                    ref={modelViewerRef}
+                    src={shawarmaModelUrl}
+                    alt="DailyBread Premium Grilled Beef Shawarma"
+                    auto-rotate
+                    camera-controls
+                    ar
+                    ar-modes="webxr scene-viewer quick-look"
+                    shadow-intensity="1.2"
+                    className="w-full h-full bg-transparent z-0"
+                    style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
+                  >
+                    <div slot="poster" className="absolute inset-0 flex flex-col items-center justify-center bg-stone-50 p-4 text-center">
+                       <img src="https://www.corriecooks.com/wp-content/uploads/2023/08/beefshawarma.jpg" alt="DailyBread Shawarma" className="w-full h-full object-cover absolute inset-0 opacity-70" referrerPolicy="no-referrer" />
+                       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex flex-col justify-center items-center p-6 text-white text-center">
+                         <div className="animate-pulse w-14 h-14 bg-brand-accent-1 rounded-full flex items-center justify-center mb-2">
+                           <Sparkles size={24} />
+                         </div>
+                         <span className="font-bold text-sm">3D AR visual mode ready</span>
+                         <span className="text-[10px] text-stone-250 mt-1 max-w-xs">Drag inside the box to rotate or tap view in AR to project inside your room!</span>
+                       </div>
+                    </div>
+                    
+                    {/* Custom AR Button slot */}
+                    <button
+                      slot="ar-button"
+                      className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white text-brand-text px-6 py-3 rounded-full font-black shadow-xl border border-stone-200 flex items-center gap-2 hover:bg-brand-bg transition-all transform hover:scale-105 active:scale-95 cursor-pointer z-20 text-xs font-ui"
+                    >
+                      <View size={16} className="text-brand-primary" />
+                      <span>PROJECT AR VIEW</span>
+                    </button>
+                  </model-viewer>
+                  
+                  <div className="absolute top-4 left-4 bg-stone-900/80 backdrop-blur-sm text-brand-bg text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-md z-10 font-mono">
+                    Interactive Food Specimen
+                  </div>
 
-              <div className="absolute bottom-4 left-4 bg-stone-950/80 backdrop-blur-sm text-amber-400 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-md border border-amber-400/20 z-10 font-mono flex items-center gap-1.5 shadow">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-450 animate-ping"></span>
-                <span>3D Gyro/Tilt Active</span>
-              </div>
+                  <div className="absolute bottom-4 left-4 bg-stone-950/80 backdrop-blur-sm text-amber-400 text-[9px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-md border border-amber-400/20 z-10 font-mono flex items-center gap-1.5 shadow">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-450 animate-ping"></span>
+                    <span>3D Gyro/Tilt Active</span>
+                  </div>
 
-              {activeProduct.badge && (
-                <div className="absolute top-4 right-4 bg-brand-primary text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md z-10 shadow-sm font-ui">
-                  {activeProduct.badge}
-                </div>
-              )}
+                  {activeProduct.id !== "signature-beef" ? (
+                    <button
+                      type="button"
+                      onClick={() => setShow3DPreview(false)}
+                      className="absolute top-4 right-4 bg-stone-900/85 hover:bg-stone-900 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-md z-20 backdrop-blur-sm border border-white/10 flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <span>📷 {activeProduct.name} Photo</span>
+                    </button>
+                  ) : (
+                    activeProduct.badge && (
+                      <div className="absolute top-4 right-4 bg-brand-primary text-white text-[10px] font-black uppercase tracking-wider px-3 py-1 rounded-md z-10 shadow-sm font-ui">
+                        {activeProduct.badge}
+                      </div>
+                    )
+                  )}
+                </>
+              ) : (
+                <div className="relative w-full h-full flex items-center justify-center bg-stone-900 overflow-hidden">
+                  <img
+                    src={activeProduct.image}
+                    alt={activeProduct.name}
+                    className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
-              {/* Graceful Fallback Warning Banner overlay */}
-              {glbLoadError && (
-                <div className="absolute bottom-4 left-4 right-4 bg-amber-50/95 border border-amber-200 p-2.5 rounded-lg shadow-md z-10 flex items-start gap-2 text-stone-850 animate-fade-in">
-                  <div className="text-base shrink-0">⚠️</div>
-                  <div className="text-[10px] leading-tight font-sans">
-                    <span className="font-bold block text-amber-800">Dynamic Asset Offline</span>
-                    Your custom-hosted GLB file returned a 404 from the CDN repo. We have fallback loaded a certified digital specimen.
+                  <div className="absolute top-4 left-4 bg-stone-900/85 backdrop-blur-md text-brand-bg text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg z-10 font-mono border border-white/10 flex items-center gap-1.5">
+                    <Sparkles size={12} className="text-amber-400" />
+                    <span>Fresh Kitchen Specialty</span>
+                  </div>
+
+                  <div className="absolute top-4 right-4 z-20">
+                    <button
+                      type="button"
+                      onClick={() => setShow3DPreview(true)}
+                      className="bg-brand-primary/95 hover:bg-brand-primary text-white text-[11px] font-bold px-3 py-1.5 rounded-full backdrop-blur-sm transition-all shadow-md flex items-center gap-1.5 hover:scale-105 active:scale-95 cursor-pointer"
+                    >
+                      <View size={14} />
+                      <span>View Shawarma in 3D AR</span>
+                    </button>
+                  </div>
+
+                  <div className="absolute bottom-4 left-4 right-4 text-white z-10">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] bg-amber-500/90 text-stone-950 font-black px-2 py-0.5 rounded font-mono uppercase tracking-wide">
+                        {activeProduct.badge}
+                      </span>
+                      <span className="text-xs text-stone-300 font-medium">Authentic Cameroonian Recipe</span>
+                    </div>
+                    <h4 className="text-lg font-bold font-heading drop-shadow-sm">{activeProduct.name}</h4>
                   </div>
                 </div>
               )}
