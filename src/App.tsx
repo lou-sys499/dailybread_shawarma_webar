@@ -20,10 +20,22 @@ import {
   Sparkles, 
   Award, 
   PartyPopper, 
-  UtensilsCrossed 
+  UtensilsCrossed,
+  Activity,
+  BarChart3,
+  Gift,
+  ShieldCheck,
+  Tag,
+  Percent,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { ThreeDPhotoEffect } from './components/ThreeDPhotoEffect';
+import { AnalyticsDashboard } from './components/AnalyticsDashboard';
+import { AdminRewardsDashboard } from './components/AdminRewardsDashboard';
+import { AdminGuard } from './components/AdminGuard';
+import { rewardsApi } from './services/rewardsApi';
 import './types';
 
 // Bind MeshoptDecoder globally immediately so that <model-viewer> internal THREE.GLTFLoader auto-detects it.
@@ -171,6 +183,40 @@ export default function App() {
   const [glbLoadError, setGlbLoadError] = useState<boolean>(false);
   const [isMeshoptReady, setIsMeshoptReady] = useState<boolean>(false);
   const modelViewerRef = React.useRef<any>(null);
+
+  // Active view: 'storefront' | 'analytics' | 'rewards_admin'
+  const [activeView, setActiveView] = useState<'storefront' | 'analytics' | 'rewards_admin'>('storefront');
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPercent: number; couponId?: string } | null>(null);
+  const [couponInput, setCouponInput] = useState<string>('');
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponSuccessMessage, setCouponSuccessMessage] = useState<string | null>(null);
+  const [sessionId] = useState<string>(() => 'sess_' + Math.floor(Math.random() * 9000 + 1000));
+
+  // Log client events to Supabase backend
+  const logAnalyticsEvent = async (event: string, campaign: string = 'Summer Shawarma Splash', data: Record<string, any> = {}) => {
+    try {
+      await fetch('/api/analytics/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          campaign,
+          event,
+          game_version: 'v1.4.2',
+          timestamp: Date.now(),
+          data
+        })
+      });
+    } catch {
+      // Non-blocking telemetry
+    }
+  };
+
+  // Track page visit on mount
+  useEffect(() => {
+    logAnalyticsEvent('menu_viewed', 'Summer Shawarma Splash', { platform: 'web', path: '/' });
+  }, []);
 
   // Guarantee MeshoptDecoder is loaded globally and compiled before custom GLB models load
   useEffect(() => {
@@ -453,6 +499,7 @@ export default function App() {
     setNoteText('');
     setCandidateIndex(0);
     setGlbLoadError(false);
+    logAnalyticsEvent('3d_ar_opened', 'Summer Shawarma Splash', { product_id: product.id, product_name: product.name });
   };
 
   // Add customized item to general cart state
@@ -482,41 +529,76 @@ export default function App() {
     setIsCartOpen(true);
   };
 
+  // Fast add from standalone product cards directly into cart
+  const addQuickProductToCart = (item: Product) => {
+    const newItem: CartItem = {
+      id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6),
+      name: item.name,
+      quantity: 1,
+      options: [],
+      zoboQty: 0,
+      fruitJuiceQty: 0,
+      noteText: '',
+      unitPrice: item.basePrice,
+      totalPrice: item.basePrice,
+    };
+    setCart((prev) => [...prev, newItem]);
+    setIsCartOpen(true);
+  };
+
   const removeFromCart = (id: string) => {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const totalCartPrice = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+  const subtotalCartPrice = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+  const discountAmount = appliedCoupon ? Math.round(subtotalCartPrice * (appliedCoupon.discountPercent / 100)) : 0;
+  const totalCartPrice = Math.max(0, subtotalCartPrice - discountAmount);
   const totalCartQuantity = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Builds direct single item instant WhatsApp redirection link
-  const buildInstantWhatsAppLink = (productName: string, qty: number, baseRate: number, exclusions: string[], zQty: number, jQty: number, notes: string) => {
-    const totalAddons = (zQty * 500) + (jQty * 500);
-    const unitPrice = baseRate + totalAddons;
-    const finalAmount = unitPrice * qty;
+  // Apply & Validate Coupon Code
+  const handleApplyCoupon = async (codeOverride?: string) => {
+    const rawCode = codeOverride || couponInput;
+    const cleanCode = rawCode.trim().toUpperCase();
+    if (!cleanCode) {
+      setCouponError('Please enter a coupon code.');
+      setCouponSuccessMessage(null);
+      return;
+    }
 
-    let text = `*New Order: DailyBread Shawarma (Bokwaongo Junction, Buea)*\n\n`;
-    text += `Hello, I'd like to place an order for delivery/pickup:\n\n`;
-    text += `🍔 *Product:* ${productName}\n`;
-    text += `🔢 *Quantity:* ${qty} unit${qty > 1 ? 's' : ''}\n`;
-    
-    if (exclusions.length > 0) {
-      text += `🚫 *Exclusions:* ${exclusions.join(', ')}\n`;
+    setIsValidatingCoupon(true);
+    setCouponError(null);
+    setCouponSuccessMessage(null);
+
+    try {
+      const res = await rewardsApi.validateCoupon(cleanCode);
+      if (res.success && res.valid) {
+        const discount = res.discountPercent || (res.coupon?.discount_percent) || 20;
+        const finalCode = res.coupon?.code_hash || cleanCode;
+        setAppliedCoupon({
+          code: finalCode,
+          discountPercent: discount,
+          couponId: res.coupon?.id
+        });
+        setCouponSuccessMessage(res.message || `🎉 ${discount}% discount coupon applied!`);
+        setCouponInput('');
+        logAnalyticsEvent('coupon_applied', 'Summer Shawarma Splash', {
+          coupon_code: finalCode,
+          discount_percent: discount
+        });
+      } else {
+        setCouponError(res.error || 'Invalid or expired coupon code.');
+      }
+    } catch (err: any) {
+      setCouponError(err.message || 'Failed to validate coupon code.');
+    } finally {
+      setIsValidatingCoupon(false);
     }
-    if (zQty > 0) {
-      text += `🍹 *Zobo Add-on:* x${zQty} (+${zQty * 500} XAF)\n`;
-    }
-    if (jQty > 0) {
-      text += `🍊 *Juice Add-on:* x${jQty} (+${jQty * 500} XAF)\n`;
-    }
-    if (notes.trim()) {
-      text += `📝 *Notes:* "${notes.trim()}"\n`;
-    }
-    text += `\n💵 *Total Price:* *${finalAmount} XAF*\n\n`;
-    text += `📍 *Location/Inquiry:* Please deliver to me in Buea.\n`;
-    text += `📞 My support reference contact is: ${phoneNumber}`;
-    
-    return `https://wa.me/237652351693?text=${encodeURIComponent(text)}`;
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError(null);
+    setCouponSuccessMessage(null);
   };
 
   // Checkout complete cart items block to WhatsApp API
@@ -543,7 +625,12 @@ export default function App() {
     });
 
     text += `--------------------------------\n`;
-    text += `💰 *Grand Total: ${totalCartPrice} XAF*\n\n`;
+    text += `📦 *Cart Subtotal:* ${subtotalCartPrice} XAF\n`;
+    if (appliedCoupon) {
+      text += `🎟️ *Coupon Applied:* ${appliedCoupon.code} (-${appliedCoupon.discountPercent}% OFF)\n`;
+      text += `💸 *Discount Savings:* -${discountAmount} XAF\n`;
+    }
+    text += `💰 *Grand Total Payable: ${totalCartPrice} XAF*\n\n`;
     text += `📍 Please deliver this to me in Buea.\n`;
     text += `📞 Support reference: ${phoneNumber}`;
 
@@ -551,6 +638,21 @@ export default function App() {
   };
 
   const handleCheckout = () => {
+    logAnalyticsEvent('order_initiated', 'Summer Shawarma Splash', {
+      subtotal_xaf: subtotalCartPrice,
+      total_xaf: totalCartPrice,
+      discount_xaf: discountAmount,
+      coupon_code: appliedCoupon ? appliedCoupon.code : null,
+      items_count: totalCartQuantity,
+      items: cart.map(i => ({ name: i.name, quantity: i.quantity, price: i.totalPrice }))
+    });
+
+    if (appliedCoupon) {
+      rewardsApi.redeemCoupon(appliedCoupon.code, totalCartPrice).catch(err => {
+        console.warn('Coupon redemption async notice:', err);
+      });
+    }
+
     setShowCheckoutSuccess(true);
     setCart([]);
   };
@@ -585,6 +687,26 @@ export default function App() {
     }, 1500);
   };
 
+  if (activeView === 'analytics') {
+    return (
+      <AnalyticsDashboard 
+        onBackToStore={() => setActiveView('storefront')} 
+        onNavigateToRewardsAdmin={() => setActiveView('rewards_admin')}
+      />
+    );
+  }
+
+  if (activeView === 'rewards_admin') {
+    return (
+      <AdminGuard onBackToHome={() => setActiveView('storefront')}>
+        <AdminRewardsDashboard 
+          onBackToStore={() => setActiveView('storefront')}
+          onNavigateToAnalytics={() => setActiveView('analytics')}
+        />
+      </AdminGuard>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text font-sans selection:bg-brand-accent-1/30 relative pb-20 md:pb-0 animate-fade-in">
       
@@ -614,7 +736,31 @@ export default function App() {
             <a href="#location" className="hover:text-brand-primary transition-colors">Find Us</a>
           </div>
 
-          <div className="flex items-center gap-3 font-ui">
+          <div className="flex items-center gap-2 md:gap-3 font-ui">
+            {/* Supabase Cyberwrap Rewards Admin Dashboard Button */}
+            <button
+              onClick={() => setActiveView('rewards_admin')}
+              className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-500/30 px-3 py-2 rounded-full text-xs font-bold transition-all shadow-sm cursor-pointer group"
+              title="Open Supabase Cyberwrap Rewards Admin Dashboard (Coupons, Claims & Player Scores)"
+              id="rewards-admin-btn"
+            >
+              <Gift size={14} className="text-amber-600 group-hover:scale-110 transition-transform" />
+              <span className="hidden sm:inline">Rewards</span>
+              <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded font-mono font-bold">Admin</span>
+            </button>
+
+            {/* Live Analytics CMS Dashboard Switcher Button */}
+            <button
+              onClick={() => setActiveView('analytics')}
+              className="flex items-center gap-1.5 bg-[#161b22] hover:bg-[#21262d] text-orange-400 border border-orange-500/30 px-3 py-2 rounded-full text-xs font-bold transition-all shadow-sm cursor-pointer group"
+              title="Open Real-Time Analytics CMS Dashboard (Supabase + Recharts)"
+              id="analytics-dashboard-btn"
+            >
+              <Activity size={14} className="text-orange-400 group-hover:animate-spin" />
+              <span className="hidden sm:inline">Analytics</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            </button>
+
             {/* Click-to-call Customer Support on Header */}
             <a 
               href={`tel:${phoneNumber}`} 
@@ -690,11 +836,11 @@ export default function App() {
                 <ChevronRight size={18} />
               </a>
               <a 
-                href="#location"
-                className="bg-white hover:bg-stone-50 text-brand-text border border-brand-text/15 text-center font-bold px-8 py-4 rounded-xl shadow-sm transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                href="#location" 
+                className="bg-white hover:bg-stone-50 text-brand-text border border-brand-text/15 text-center font-bold px-6 py-4 rounded-xl shadow-sm transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
               >
                 <MapPin size={18} className="text-brand-primary" />
-                <span>Get Directions (Maps Pin)</span>
+                <span>Directions</span>
               </a>
             </div>
 
@@ -1038,24 +1184,19 @@ export default function App() {
                />
             </div>
 
-            {/* Quick Action Block: Order Directly via WhatsApp OR Queue in Cart */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 font-ui">
+            {/* Action Block: Add Customized Item to Cart & Open Checkout */}
+            <div className="pt-2 font-ui space-y-2">
               <button 
+                id="btn-add-custom-to-cart"
                 onClick={addToCart}
-                className="w-full bg-brand-text hover:bg-brand-primary text-white py-3 px-4 rounded-xl font-bold text-sm tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 border border-transparent shadow-sm"
+                className="w-full bg-brand-primary hover:bg-brand-accent-2 text-white py-3.5 px-6 rounded-xl font-bold text-sm tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-brand-primary/20"
               >
-                <ShoppingCart size={15} />
-                <span>Add to Order Cart</span>
+                <ShoppingCart size={16} />
+                <span>Add to Cart & Apply Coupons ({currentTotalPrice} XAF)</span>
               </button>
-
-              <a 
-                href={buildInstantWhatsAppLink(activeProduct.name, quantity, activeProduct.basePrice, selectedOptions, zoboQty, fruitJuiceQty, noteText)}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full bg-brand-primary hover:bg-brand-accent-2 text-white py-3 px-4 rounded-xl font-extrabold text-sm tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-brand-primary/10"
-              >
-                <span>Order Now via WhatsApp</span>
-              </a>
+              <p className="text-center text-[11px] text-brand-text/60 font-sans">
+                Review your order items, enter promo codes, and complete WhatsApp checkout in your cart.
+              </p>
             </div>
 
           </div>
@@ -1089,22 +1230,25 @@ export default function App() {
                      </div>
                    </div>
 
-                   <div className="p-4 pt-1 bg-stone-50/50 flex gap-1.5 font-ui">
+                   <div className="p-4 pt-1 bg-stone-50/50 flex gap-2 font-ui">
                      <button 
-                       onClick={() => handleProductSelection(item)}
-                       className="flex-1 bg-white hover:bg-stone-100 text-brand-text border border-brand-text/10 py-2 rounded-lg text-[11px] font-bold transition-colors cursor-pointer"
+                       onClick={() => {
+                         handleProductSelection(item);
+                         const menuElem = document.getElementById('menu');
+                         if (menuElem) menuElem.scrollIntoView({ behavior: 'smooth' });
+                       }}
+                       className="flex-1 bg-white hover:bg-stone-100 text-brand-text border border-brand-text/15 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer text-center"
                      >
                        Customize
                      </button>
-                     <a 
-                       href={buildInstantWhatsAppLink(item.name, 1, item.basePrice, [], 0, 0, "")}
-                       target="_blank"
-                       rel="noreferrer"
-                       className="bg-brand-primary hover:bg-brand-accent-2 text-white px-3 py-2 rounded-lg text-[11px] font-bold transition-colors cursor-pointer text-center"
-                       title="Order 1 instantly on WhatsApp"
+                     <button 
+                       onClick={() => addQuickProductToCart(item)}
+                       className="flex-1 bg-brand-primary hover:bg-brand-accent-2 text-white py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-sm text-center"
+                       title="Add directly to cart"
                      >
-                       Instant Order
-                     </a>
+                       <ShoppingCart size={13} />
+                       <span>Add to Cart</span>
+                     </button>
                    </div>
                  </div>
                );
@@ -1740,6 +1884,22 @@ export default function App() {
                <li><a href="#catering" className="hover:text-amber-400 transition-colors">Event & Catering Services</a></li>
                <li><a href="#about" className="hover:text-amber-400 transition-colors">About DailyBread Studio</a></li>
                <li><a href="#location" className="hover:text-amber-400 transition-colors">Google Maps Directions</a></li>
+               <li>
+                 <button 
+                   onClick={() => setActiveView('rewards_admin')} 
+                   className="text-amber-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                 >
+                   <span>🎁 Cyberwrap Rewards Admin</span>
+                 </button>
+               </li>
+               <li>
+                 <button 
+                   onClick={() => setActiveView('analytics')} 
+                   className="text-orange-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                 >
+                   <span>📊 Live Analytics CMS</span>
+                 </button>
+               </li>
              </ul>
           </div>
 
@@ -1871,10 +2031,117 @@ export default function App() {
               </div>
 
               {!showCheckoutSuccess && cart.length > 0 && (
-                <div className="px-6 py-6 border-t border-brand-text/10 bg-white rounded-b-3xl space-y-4 shadow-xl font-ui">
-                  <div className="flex justify-between items-center bg-stone-50 p-4 rounded-xl border border-stone-200">
-                    <span className="font-bold text-xs text-brand-text/70 uppercase font-mono">Order Grand Total:</span>
-                    <span className="text-xl font-bold text-brand-primary font-mono">{totalCartPrice} XAF</span>
+                <div className="px-6 py-5 border-t border-brand-text/10 bg-white rounded-b-3xl space-y-4 shadow-xl font-ui">
+                  
+                  {/* Coupon Code Application Box */}
+                  <div className="bg-stone-50/90 p-3.5 rounded-2xl border border-stone-200/80 space-y-2.5 font-sans" id="coupon-apply-section">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-brand-text">
+                      <Tag size={13} className="text-brand-primary" />
+                      <span>Have a Coupon Code?</span>
+                    </div>
+
+                    {appliedCoupon ? (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center justify-between gap-2 animate-in fade-in duration-150">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                            <Percent size={13} strokeWidth={3} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono font-bold text-xs text-emerald-900 tracking-wide">{appliedCoupon.code}</span>
+                              <span className="bg-emerald-200 text-emerald-800 text-[10px] font-extrabold px-1.5 py-0.2 rounded font-mono">
+                                -{appliedCoupon.discountPercent}% OFF
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-emerald-700 font-sans mt-0.5">
+                              Saving <span className="font-bold font-mono">{discountAmount} XAF</span> on this order!
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveCoupon}
+                          className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                          title="Remove applied coupon"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <input
+                            id="coupon-code-input"
+                            type="text"
+                            value={couponInput}
+                            onChange={(e) => {
+                              setCouponInput(e.target.value.toUpperCase());
+                              if (couponError) setCouponError(null);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleApplyCoupon();
+                              }
+                            }}
+                            placeholder="e.g. SHAWARMA-20-4451"
+                            className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono font-semibold uppercase text-brand-text placeholder:text-stone-400 placeholder:normal-case focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary transition-all"
+                            disabled={isValidatingCoupon}
+                          />
+                          <button
+                            type="button"
+                            id="btn-apply-coupon"
+                            onClick={() => handleApplyCoupon()}
+                            disabled={isValidatingCoupon || !couponInput.trim()}
+                            className="px-4 py-2 bg-brand-text hover:bg-brand-primary disabled:bg-stone-300 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed shrink-0"
+                          >
+                            {isValidatingCoupon ? (
+                              <Loader2 size={13} className="animate-spin" />
+                            ) : (
+                              <Check size={13} strokeWidth={3} />
+                            )}
+                            <span>Apply</span>
+                          </button>
+                        </div>
+
+                        {couponError && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-red-600 font-medium bg-red-50 px-2.5 py-1.5 rounded-lg border border-red-200/60">
+                            <AlertCircle size={12} className="shrink-0" />
+                            <span className="break-words">{couponError}</span>
+                          </div>
+                        )}
+
+                        {couponSuccessMessage && (
+                          <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 font-medium bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200/60">
+                            <Check size={12} className="shrink-0" />
+                            <span className="break-words">{couponSuccessMessage}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Order Total Breakdown */}
+                  <div className="bg-stone-50 p-3.5 rounded-xl border border-stone-200 space-y-1.5 font-mono">
+                    <div className="flex justify-between items-center text-xs text-brand-text/70">
+                      <span>Subtotal:</span>
+                      <span className="font-semibold">{subtotalCartPrice} XAF</span>
+                    </div>
+
+                    {appliedCoupon && (
+                      <div className="flex justify-between items-center text-xs text-emerald-600 font-semibold">
+                        <span className="flex items-center gap-1">
+                          <Percent size={11} />
+                          <span>Discount ({appliedCoupon.discountPercent}%):</span>
+                        </span>
+                        <span>-{discountAmount} XAF</span>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-stone-200 flex justify-between items-center">
+                      <span className="font-bold text-xs text-brand-text uppercase">Order Grand Total:</span>
+                      <span className="text-xl font-bold text-brand-primary">{totalCartPrice} XAF</span>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -1907,16 +2174,26 @@ export default function App() {
       )}
 
       {/* 11. Sticky WhatsApp & Click-to-Call Buttons for mobile overlay */}
-      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-brand-text/10 p-3 flex sm:hidden justify-between items-center gap-3 z-30 shadow-2xl font-ui">
+      <div className="fixed bottom-0 inset-x-0 bg-white border-t border-brand-text/10 p-2.5 flex sm:hidden justify-between items-center gap-2 z-30 shadow-2xl font-ui">
          
+         {/* Mobile Analytics toggle */}
+         <button
+           onClick={() => setActiveView('analytics')}
+           className="bg-[#161b22] text-orange-400 border border-orange-500/30 py-3 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+           title="View Live Analytics"
+         >
+           <Activity size={14} className="text-orange-400 animate-pulse" />
+           <span>Analytics</span>
+         </button>
+
          {/* Mobile Click-to-Call direct anchor link */}
          <a 
            href={`tel:${phoneNumber}`} 
-           className="flex-1 bg-brand-text hover:bg-brand-text/90 text-white py-3.5 px-2 rounded-xl text-xs font-bold tracking-wide text-center flex items-center justify-center gap-2 cursor-pointer"
+           className="flex-1 bg-brand-text hover:bg-brand-text/90 text-white py-3 px-2 rounded-xl text-xs font-bold tracking-wide text-center flex items-center justify-center gap-1 cursor-pointer"
            title="Tap to Call Support Directly"
          >
-           <Phone size={15} />
-           <span>📞 Call Us</span>
+           <Phone size={14} />
+           <span>Call Us</span>
          </a>
 
          {/* Sticky WhatsApp Chat CTA */}
@@ -1924,10 +2201,10 @@ export default function App() {
            href={`https://wa.me/237652351693`} 
            target="_blank" 
            rel="noreferrer"
-           className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3.5 px-2 rounded-xl text-xs font-bold tracking-wide text-center flex items-center justify-center gap-2 shadow-lg cursor-pointer"
+           className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-2 rounded-xl text-xs font-bold tracking-wide text-center flex items-center justify-center gap-1 shadow-lg cursor-pointer"
            title="Open live chat on WhatsApp"
          >
-           <span>💬 WhatsApp Order</span>
+           <span>WhatsApp</span>
          </a>
 
       </div>

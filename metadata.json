@@ -1,6 +1,6 @@
 {
   "name": "DailyBread Shawarma AR",
-  "description": "An augmented reality storefront for DailyBread Shawarma using 3D web components.",
+  "description": "An augmented reality storefront and real-time analytics dashboard powered by Supabase and Recharts for DailyBread Shawarma.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
