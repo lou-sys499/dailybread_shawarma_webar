@@ -28,13 +28,16 @@ import {
   Tag,
   Percent,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Gamepad2,
+  ExternalLink
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { ThreeDPhotoEffect } from './components/ThreeDPhotoEffect';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { AdminRewardsDashboard } from './components/AdminRewardsDashboard';
 import { AdminGuard } from './components/AdminGuard';
+import { CyberWrapBanner } from './components/CyberWrapBanner';
 import { rewardsApi } from './services/rewardsApi';
 import './types';
 
@@ -641,6 +644,11 @@ export default function App() {
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text font-sans selection:bg-brand-accent-1/30 relative pb-20 md:pb-0 animate-fade-in">
       
+      {/* 0. CyberWrap Arcade, 3D & Rewards Global Announcement Banner */}
+      <CyberWrapBanner 
+        onPlayClick={() => logAnalyticsEvent('cyberwrap_banner_clicked', 'Summer Shawarma Splash', { source: 'top_banner' })}
+      />
+
       {/* 1. Header with Sticky Top Bar details */}
       <header className="sticky top-0 bg-white/90 backdrop-blur-md z-40 border-b border-brand-text/5 shadow-sm transition-all font-ui">
         <div className="max-w-6xl mx-auto px-4 md:px-8 py-4 flex justify-between items-center">
@@ -2086,6 +2094,21 @@ export default function App() {
                             <span className="break-words">{couponSuccessMessage}</span>
                           </div>
                         )}
+
+                        {/* CyberWrap Play to win coupon helper */}
+                        <div className="pt-1.5 flex items-center justify-between text-[11px] text-stone-500 border-t border-stone-200/60">
+                          <span>Don't have a coupon?</span>
+                          <a
+                            href="https://cyberwrap.dailybreadshawarma.store"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-amber-700 hover:text-amber-900 font-bold hover:underline inline-flex items-center gap-1 transition-colors"
+                          >
+                            <Gamepad2 size={11} className="text-amber-600" />
+                            <span>Play CyberWrap for 20% off</span>
+                            <ExternalLink size={10} />
+                          </a>
+                        </div>
                       </div>
                     )}
                   </div>
