@@ -7,9 +7,21 @@ import {
   Activity, Users, Ticket, Award, RefreshCw, Filter, Search, 
   Database, CheckCircle2, AlertTriangle, ArrowUpRight, Download, 
   PlusCircle, Play, Eye, Copy, Check, ChevronDown, ChevronUp,
-  Sparkles, Layers, ShieldCheck, Flame, Gift, ArrowLeft
+  Sparkles, Layers, ShieldCheck, Flame, Gift, ArrowLeft,
+  DollarSign, TrendingUp, Compass, ShoppingBag, Info, Clock, ExternalLink
 } from 'lucide-react';
-import { AnalyticsDashboardData, AnalyticsEvent } from '../types/analytics';
+import { 
+  AnalyticsDashboardData, 
+  AnalyticsEvent, 
+  FunnelStep, 
+  ExecutiveKPIs, 
+  RevenueImpact, 
+  PlayerEngagementMetrics, 
+  SourcePerformanceItem,
+  GameModeFilter 
+} from '../types/analytics';
+import { rewardsApi } from '../services/rewardsApi';
+import { AdminRewardsMetrics } from '../types/rewards';
 
 interface AnalyticsDashboardProps {
   onBackToStore?: () => void;
@@ -23,8 +35,13 @@ export function AnalyticsDashboard({ onBackToStore, onNavigateToRewardsAdmin }: 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Authoritative rewards metrics from backend
+  const [rewardsMetrics, setRewardsMetrics] = useState<AdminRewardsMetrics | null>(null);
+
   // Filters & Controls
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
+  const [selectedSource, setSelectedSource] = useState<string>('all');
+  const [selectedGameMode, setSelectedGameMode] = useState<GameModeFilter>('all');
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
@@ -45,11 +62,13 @@ export function AnalyticsDashboard({ onBackToStore, onNavigateToRewardsAdmin }: 
   // Simulation Form State
   const [simForm, setSimForm] = useState({
     session_id: `sess_${Math.floor(Math.random() * 9000) + 1000}`,
-    campaign: 'Summer Shawarma Splash',
-    event: 'coupon_earned',
+    campaign: 'dailybread-cyberwrap',
+    source: 'website',
+    game_mode: 'challenge',
+    event: 'challenge_completed',
     game_version: 'v1.4.2',
-    score: 650,
-    coupon_code: 'BUEA-VIP-20',
+    score: 220,
+    coupon_code: 'SHAWARMA-20-8842',
     discount: '20%'
   });
 
@@ -61,11 +80,18 @@ export function AnalyticsDashboard({ onBackToStore, onNavigateToRewardsAdmin }: 
         ? `/api/analytics/summary?campaign=${encodeURIComponent(selectedCampaign)}` 
         : '/api/analytics/summary';
       
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      const json: AnalyticsDashboardData = await res.json();
+      const [analyticsRes, rewardsRes] = await Promise.all([
+        fetch(url),
+        rewardsApi.getOverview().catch(() => null)
+      ]);
+
+      if (!analyticsRes.ok) throw new Error(`HTTP error ${analyticsRes.status}`);
+      const json: AnalyticsDashboardData = await analyticsRes.json();
       
       setData(json);
+      if (rewardsRes?.metrics) {
+        setRewardsMetrics(rewardsRes.metrics);
+      }
       setError(null);
     } catch (err: any) {
       console.error('Analytics fetch error:', err);
@@ -104,15 +130,21 @@ export function AnalyticsDashboard({ onBackToStore, onNavigateToRewardsAdmin }: 
   const handleSimulateEvent = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     try {
-      let customData: Record<string, any> = {};
-      if (simForm.event === 'game_played') {
-        customData = { score: simForm.score, duration_sec: 28 };
+      let customData: Record<string, any> = {
+        source: simForm.source,
+        game_mode: simForm.game_mode,
+      };
+
+      if (simForm.event === 'game_started') {
+        customData = { ...customData, game_mode: simForm.game_mode, device: 'desktop' };
+      } else if (simForm.event === 'challenge_completed') {
+        customData = { ...customData, score: simForm.score, duration_sec: 45, reached_threshold: simForm.score >= 200 };
       } else if (simForm.event === 'coupon_earned') {
-        customData = { coupon_code: simForm.coupon_code || 'SHAWARMA-GOLD', discount: simForm.discount || '15%' };
+        customData = { ...customData, coupon_code: simForm.coupon_code, discount: simForm.discount, threshold: 200 };
       } else if (simForm.event === 'coupon_redeemed') {
-        customData = { order_value_xaf: 4000, channel: 'whatsapp_web', coupon_code: simForm.coupon_code || 'SHAWARMA-GOLD' };
-      } else {
-        customData = { ar_view_duration_sec: 15, item: '3d_beef_shawarma' };
+        customData = { ...customData, coupon_code: simForm.coupon_code, channel: 'whatsapp_web' };
+      } else if (simForm.event === 'order_initiated') {
+        customData = { ...customData, cart_count: 2, subtotal_xaf: 5000, coupon_applied: true };
       }
 
       const res = await fetch('/api/analytics/events', {
@@ -122,630 +154,1001 @@ export function AnalyticsDashboard({ onBackToStore, onNavigateToRewardsAdmin }: 
           session_id: simForm.session_id,
           campaign: simForm.campaign,
           event: simForm.event,
-          game_version: simForm.game_version,
           timestamp: Date.now(),
-          data: customData
+          game_version: simForm.game_version,
+          data: customData,
+          player_id: `ply_${Math.floor(Math.random() * 8999 + 1000)}`
         })
       });
 
       if (res.ok) {
-        setActionMessage(`✓ Event "${simForm.event}" logged successfully!`);
-        setTimeout(() => setActionMessage(null), 3000);
+        setActionMessage(`Logged event "${simForm.event}" successfully!`);
+        setTimeout(() => setActionMessage(null), 3500);
         setShowSimulateModal(false);
-        // Refresh session id for next event
-        setSimForm(prev => ({ ...prev, session_id: `sess_${Math.floor(Math.random() * 9000) + 1000}` }));
-        fetchData(true);
+        fetchData();
+      } else {
+        const err = await res.json();
+        alert('Failed: ' + (err.error || 'Unknown error'));
       }
     } catch (err: any) {
-      console.error('Failed to log event:', err);
+      alert('Error logging event: ' + err.message);
     }
   };
 
-  // Quick Seed Data
-  const handleSeedData = async () => {
-    try {
-      setIsRefreshing(true);
-      const res = await fetch('/api/analytics/seed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count: 25 })
-      });
-      if (res.ok) {
-        setActionMessage('✓ Seeded 25 test records across campaigns!');
-        setTimeout(() => setActionMessage(null), 3500);
-        fetchData();
-      }
-    } catch (err) {
-      console.error('Seed error:', err);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  // Filter raw events for the interactive table
+  // Filter raw events based on user selection
   const filteredEvents = useMemo(() => {
     if (!data?.rawEvents) return [];
-    return data.rawEvents.filter(ev => {
-      const matchesCampaign = selectedCampaign === 'all' || ev.campaign === selectedCampaign;
-      const matchesEvent = selectedEvent === 'all' || ev.event === selectedEvent;
-      const matchesSearch = !searchQuery.trim() || 
-        ev.session_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ev.event.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ev.campaign.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (ev.data && JSON.stringify(ev.data).toLowerCase().includes(searchQuery.toLowerCase()));
+    return data.rawEvents.filter((ev) => {
+      // Event filter
+      if (selectedEvent !== 'all' && ev.event !== selectedEvent) return false;
+      
+      // Source filter
+      if (selectedSource !== 'all') {
+        const eventSource = ev.data?.source || (ev.data?.placement?.includes('table') ? 'qr_table' : 'website');
+        if (eventSource !== selectedSource) return false;
+      }
 
-      return matchesCampaign && matchesEvent && matchesSearch;
+      // Game mode filter
+      if (selectedGameMode !== 'all') {
+        const mode = ev.data?.game_mode || 'challenge';
+        if (mode !== selectedGameMode) return false;
+      }
+
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchSession = ev.session_id?.toLowerCase().includes(q);
+        const matchEvent = ev.event?.toLowerCase().includes(q);
+        const matchCampaign = ev.campaign?.toLowerCase().includes(q);
+        const matchData = JSON.stringify(ev.data || {}).toLowerCase().includes(q);
+        return matchSession || matchEvent || matchCampaign || matchData;
+      }
+      return true;
     });
-  }, [data?.rawEvents, selectedCampaign, selectedEvent, searchQuery]);
+  }, [data?.rawEvents, selectedEvent, selectedSource, selectedGameMode, searchQuery]);
 
-  // Paginated events
-  const paginatedEvents = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredEvents.slice(start, start + pageSize);
-  }, [filteredEvents, currentPage, pageSize]);
+  // Derived Business Metrics
 
-  const totalPages = Math.ceil(filteredEvents.length / pageSize) || 1;
+  // 1. Executive KPIs
+  const executiveKPIs: ExecutiveKPIs = useMemo(() => {
+    const raw = data?.rawEvents || [];
+    const uniquePlayers = new Set(raw.map(e => e.player_id || e.session_id)).size;
+    const challengesCompleted = raw.filter(e => e.event === 'challenge_completed').length;
+    const couponsGenerated = rewardsMetrics?.totalCoupons ?? raw.filter(e => e.event === 'coupon_earned' || e.event === 'reward_earned').length;
+    const couponsRedeemed = rewardsMetrics?.redeemedCoupons ?? raw.filter(e => e.event === 'coupon_redeemed').length;
+    const playersReceivingCoupons = rewardsMetrics?.totalPlayers ?? new Set(
+      raw.filter(e => e.event === 'coupon_earned' || e.event === 'reward_earned').map(e => e.player_id || e.session_id)
+    ).size;
+    
+    // Count WhatsApp order intent (order_cta_clicked or order_initiated)
+    const orderIntentCount = data?.websiteKPIs?.orderIntentCount ?? raw.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated').length;
 
-  // Export raw filtered events to CSV
-  const handleExportCSV = () => {
+    return {
+      monthlyPlayers: Math.max(uniquePlayers, 1),
+      challengesCompleted,
+      playersReceivingCoupons,
+      couponsGenerated,
+      couponsRedeemed,
+      incrementalOrders: orderIntentCount,
+      incrementalRevenue: 'Attribution Pending',
+      isRevenueAttributionPending: true
+    };
+  }, [data?.rawEvents, data?.websiteKPIs, rewardsMetrics]);
+
+  // 2. Conversion Funnel calculation
+  const funnelSteps: FunnelStep[] = useMemo(() => {
+    const raw = data?.rawEvents || [];
+    
+    // Count events in journey
+    const gameStarts = raw.filter(e => e.event === 'game_started' || e.event === 'game_played' || e.event === 'cyberwrap_launch_clicked').length;
+    const challenges = raw.filter(e => e.event === 'challenge_completed' || e.event === 'game_completed').length;
+    const thresholdReached = raw.filter(e => 
+      e.event === 'reward_threshold_reached' || 
+      (e.event === 'challenge_completed' && (e.data?.score >= 200 || e.data?.reached_threshold))
+    ).length;
+    const couponsGenerated = rewardsMetrics?.totalCoupons ?? raw.filter(e => e.event === 'coupon_earned' || e.event === 'reward_earned').length;
+    const couponsViewed = raw.filter(e => e.event === 'coupon_viewed' || e.event === 'reward_viewed').length;
+    const couponsRedeemed = rewardsMetrics?.redeemedCoupons ?? raw.filter(e => e.event === 'coupon_redeemed').length;
+    const ordersInitiated = data?.websiteKPIs?.orderIntentCount ?? raw.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated').length;
+
+    const topCount = Math.max(gameStarts, 1);
+
+    const stepsRaw = [
+      { id: 'start', name: 'Game Started', count: gameStarts, notes: 'Player initiated CyberWrap run' },
+      { id: 'challenge', name: 'Challenge Completed', count: challenges, notes: 'Finished run in Buea city' },
+      { id: 'threshold', name: '200 Points Reached', count: thresholdReached, notes: 'Scored 200+ delivery points' },
+      { id: 'coupon_gen', name: 'Coupon Generated', count: couponsGenerated, notes: '20% coupon issued (7-day)' },
+      { id: 'coupon_view', name: 'Coupon Viewed', count: couponsViewed, notes: 'Code viewed in reward card' },
+      { id: 'coupon_redeem', name: 'Coupon Applied', count: couponsRedeemed, notes: 'Code verified in cart' },
+      { id: 'restaurant_order', name: 'WhatsApp Order Intent', count: ordersInitiated, isPendingAttribution: true, notes: 'WhatsApp order intent initiated' },
+      { id: 'repeat_order', name: 'Confirmed Order', count: 0, isPendingAttribution: true, notes: 'Pending restaurant confirmation' }
+    ];
+
+    return stepsRaw.map((step, idx) => {
+      const prevCount = idx === 0 ? topCount : Math.max(stepsRaw[idx - 1].count, 1);
+      const conversionRate = Math.min(100, Math.round((step.count / topCount) * 100));
+      const stepConversionRate = Math.min(100, Math.round((step.count / prevCount) * 100));
+      const dropOffRate = 100 - stepConversionRate;
+
+      return {
+        ...step,
+        conversionRate,
+        stepConversionRate,
+        dropOffRate: Math.max(0, dropOffRate)
+      };
+    });
+  }, [data?.rawEvents, data?.websiteKPIs, rewardsMetrics]);
+
+  // 3. Player Engagement Metrics
+  const engagementMetrics: PlayerEngagementMetrics = useMemo(() => {
+    const raw = data?.rawEvents || [];
+    const uniqueSessions = new Set(raw.map(e => e.session_id)).size;
+    const uniquePlayers = Math.max(new Set(raw.map(e => e.player_id || e.session_id)).size, 1);
+    
+    // Average score from completed challenges
+    const scores = raw
+      .filter(e => (e.event === 'challenge_completed' || e.event === 'game_played') && e.data?.score)
+      .map(e => Number(e.data.score));
+    const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+
+    // Average duration
+    const durations = raw
+      .filter(e => e.data?.duration_sec)
+      .map(e => Number(e.data.duration_sec));
+    const avgPlayDurationSec = durations.length > 0 ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 35;
+
+    const gameStarts = raw.filter(e => e.event === 'game_started' || e.event === 'game_played' || e.event === 'cyberwrap_launch_clicked').length;
+    const challenges = raw.filter(e => e.event === 'challenge_completed' || e.event === 'game_completed').length;
+    const thresholdReached = raw.filter(e => 
+      e.event === 'reward_threshold_reached' || (e.data?.score >= 200)
+    ).length;
+
+    const challengeCompletionRate = gameStarts > 0 ? Math.round((challenges / gameStarts) * 100) : 0;
+    const thresholdAchievementRate = challenges > 0 ? Math.round((thresholdReached / challenges) * 100) : 0;
+
+    return {
+      uniquePlayers,
+      uniqueSessions,
+      avgSessionsPerPlayer: Number((uniqueSessions / uniquePlayers).toFixed(1)),
+      avgPlayDurationSec,
+      avgScore,
+      challengeCompletionRate,
+      thresholdAchievementRate,
+      returningPlayers: Math.max(0, uniquePlayers - Math.round(uniquePlayers * 0.7))
+    };
+  }, [data?.rawEvents]);
+
+  // 4. Acquisition Sources Performance
+  const sourcePerformance: SourcePerformanceItem[] = useMemo(() => {
+    if (data?.sourcePerformance && data.sourcePerformance.length > 0) {
+      return data.sourcePerformance;
+    }
+
+    const raw = data?.rawEvents || [];
+    const sourcesList = [
+      { id: 'website', name: 'Website (Direct/Organic)' },
+      { id: 'instagram', name: 'Instagram' },
+      { id: 'qr_table', name: 'QR Table Stand' },
+      { id: 'qr_counter', name: 'QR Checkout Counter' },
+      { id: 'qr_receipt', name: 'QR Receipt' },
+      { id: 'qr_delivery', name: 'QR Takeout Bag' },
+      { id: 'social', name: 'Social Media' },
+      { id: 'direct', name: 'Direct Link' }
+    ];
+
+    return sourcesList.map(s => {
+      const sourceEvents = raw.filter(e => {
+        const evSource = (e.source || e.data?.source || (e.data?.placement?.includes('table') ? 'qr_table' : 'website')).toLowerCase();
+        return evSource === s.id;
+      });
+
+      const visitors = new Set(sourceEvents.filter(e => e.visitor_id).map(e => e.visitor_id as string)).size ||
+                       new Set(sourceEvents.map(e => e.session_id)).size;
+      const sessions = new Set(sourceEvents.map(e => e.session_id)).size;
+      const players = new Set(sourceEvents.filter(e => e.player_id).map(e => e.player_id as string)).size;
+      const gameStarts = sourceEvents.filter(e => ['game_started', 'game_played', 'cyberwrap_launch_clicked'].includes(e.event)).length;
+      const challengesCompleted = sourceEvents.filter(e => ['challenge_completed', 'game_completed'].includes(e.event)).length;
+      const couponsEarned = sourceEvents.filter(e => ['coupon_earned', 'reward_earned'].includes(e.event)).length;
+      const couponsRedeemed = sourceEvents.filter(e => e.event === 'coupon_redeemed').length;
+      const menuViews = sourceEvents.filter(e => e.event === 'menu_viewed').length;
+      const orderIntentCount = sourceEvents.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated').length;
+      const whatsappOrderOpened = sourceEvents.filter(e => e.event === 'whatsapp_order_opened').length;
+      const conversionToWhatsAppIntent = sessions > 0 ? Number(((orderIntentCount / sessions) * 100).toFixed(1)) : 0;
+
+      return {
+        source: s.id,
+        displayName: s.name,
+        visitors,
+        sessions,
+        players,
+        gameStarts,
+        challengesCompleted,
+        couponsEarned,
+        couponsRedeemed,
+        menuViews,
+        orderIntentCount,
+        whatsappOrderOpened,
+        conversionToWhatsAppIntent,
+        ordersInitiated: orderIntentCount
+      };
+    });
+  }, [data?.sourcePerformance, data?.rawEvents]);
+
+  // 5. Live Activity Feed (Filtered human-readable stream)
+  const liveActivityFeed = useMemo(() => {
+    const raw = data?.rawEvents || [];
+    return raw.slice(0, 8).map(ev => {
+      let icon = <Activity size={16} className="text-orange-400" />;
+      let title = ev.event.replace(/_/g, ' ');
+      let detail = `Session ${ev.session_id}`;
+
+      if (ev.event === 'game_started') {
+        icon = <Play size={16} className="text-blue-400" />;
+        title = 'New CyberWrap Session';
+        detail = `Mode: ${ev.data?.game_mode || 'Challenge'} • ${ev.campaign}`;
+      } else if (ev.event === 'challenge_completed') {
+        icon = <Award size={16} className="text-amber-400" />;
+        title = 'Challenge Completed';
+        detail = `Score: ${ev.data?.score || 0} pts • Duration: ${ev.data?.duration_sec || 30}s`;
+      } else if (ev.event === 'coupon_earned') {
+        icon = <Gift size={16} className="text-emerald-400" />;
+        title = '20% Coupon Earned';
+        detail = `Code: ${ev.data?.coupon_code || 'SHAWARMA-20-XXXX'}`;
+      } else if (ev.event === 'coupon_viewed') {
+        icon = <Eye size={16} className="text-purple-400" />;
+        title = 'Coupon Viewed';
+        detail = 'Player inspected active discount card';
+      } else if (ev.event === 'coupon_redeemed') {
+        icon = <CheckCircle2 size={16} className="text-emerald-400" />;
+        title = 'Coupon Redeemed';
+        detail = `Applied 20% discount in cart checkout`;
+      } else if (ev.event === 'order_initiated') {
+        icon = <ShoppingBag size={16} className="text-orange-500" />;
+        title = 'WhatsApp Order Initiated';
+        detail = `Cart items: ${ev.data?.cart_count || 1} • Est: ${ev.data?.total_xaf || 4000} XAF`;
+      } else if (ev.event === '3d_ar_opened') {
+        icon = <Compass size={16} className="text-cyan-400" />;
+        title = 'AR Landmark / 3D Viewer';
+        detail = `Explored item: ${ev.data?.item_id || 'Signature Beef'}`;
+      }
+
+      return {
+        id: ev.id,
+        icon,
+        title,
+        detail,
+        timestamp: new Date(ev.created_at).toLocaleTimeString()
+      };
+    });
+  }, [data?.rawEvents]);
+
+  // Export filtered events as CSV
+  const exportToCSV = () => {
     if (!filteredEvents.length) return;
-    const headers = ['id', 'session_id', 'campaign', 'event', 'timestamp', 'game_version', 'created_at', 'data'];
-    const rows = filteredEvents.map(ev => [
-      ev.id,
-      ev.session_id,
-      `"${ev.campaign.replace(/"/g, '""')}"`,
-      ev.event,
-      ev.timestamp,
-      ev.game_version,
-      ev.created_at,
-      `"${JSON.stringify(ev.data || {}).replace(/"/g, '""')}"`
+    const headers = ['ID', 'Session ID', 'Campaign', 'Event', 'Timestamp', 'Game Version', 'Data', 'Created At'];
+    const rows = filteredEvents.map(e => [
+      e.id,
+      e.session_id,
+      e.campaign,
+      e.event,
+      e.timestamp,
+      e.game_version,
+      JSON.stringify(e.data || {}).replace(/"/g, '""'),
+      e.created_at
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(f => `"${f}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `analytics_events_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `dailybread_analytics_${new Date().toISOString().slice(0,10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const copySqlToClipboard = () => {
-    const sql = `-- Supabase Table Schema for public.analytics_events
+    const sql = `-- Supabase Table: public.analytics_events
 CREATE TABLE IF NOT EXISTS public.analytics_events (
   id BIGSERIAL PRIMARY KEY,
   session_id TEXT NOT NULL,
-  campaign TEXT NOT NULL,
+  campaign TEXT NOT NULL DEFAULT 'dailybread-cyberwrap',
   event TEXT NOT NULL,
   timestamp BIGINT NOT NULL,
-  game_version TEXT DEFAULT 'v1.0.0',
+  game_version TEXT DEFAULT 'v1.4.2',
   data JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  player_id UUID NULL
 );
 
--- Enable RLS and create policy for server service role access
 ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow server access to analytics_events"
-ON public.analytics_events
-FOR ALL
-USING (true)
-WITH CHECK (true);
-
--- Index for high-performance aggregations & time-series
+CREATE POLICY "Allow public insert analytics" ON public.analytics_events FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow authenticated admins read analytics" ON public.analytics_events FOR SELECT TO authenticated USING (true);
 CREATE INDEX IF NOT EXISTS idx_analytics_created_at ON public.analytics_events (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_analytics_event_campaign ON public.analytics_events (event, campaign);
-`;
+CREATE INDEX IF NOT EXISTS idx_analytics_event ON public.analytics_events (event);`;
     navigator.clipboard.writeText(sql);
     setCopiedSql(true);
-    setTimeout(() => setCopiedSql(false), 2500);
+    setTimeout(() => setCopiedSql(false), 2000);
   };
 
-  // Badge styler for events
-  const getEventBadge = (event: string) => {
-    switch (event) {
-      case 'game_played':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">🎮 Game Played</span>;
-      case 'coupon_earned':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300">🎟️ Coupon Earned</span>;
-      case 'coupon_redeemed':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">🔥 Redeemed</span>;
-      case '3d_ar_opened':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">👓 3D AR Opened</span>;
-      case 'order_initiated':
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-200">🛒 Order Initiated</span>;
-      default:
-        return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-800 border border-stone-200">{event}</span>;
-    }
-  };
+  // Pagination calculation
+  const totalPages = Math.ceil(filteredEvents.length / pageSize) || 1;
+  const paginatedEvents = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredEvents.slice(start, start + pageSize);
+  }, [filteredEvents, currentPage, pageSize]);
 
   return (
-    <div className="min-h-screen bg-[#0d1117] text-stone-100 font-sans pb-24 selection:bg-orange-500/30">
+    <div className="min-h-screen bg-[#0a0d14] text-slate-100 font-sans selection:bg-orange-500/30 pb-20">
       
-      {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 bg-[#161b22]/90 backdrop-blur-md border-b border-white/10 px-4 md:px-8 py-3.5 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          
-          <div className="flex items-center gap-3">
-            {onBackToStore && (
-              <button 
-                onClick={onBackToStore}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-semibold text-stone-300 border border-white/10 transition-all cursor-pointer"
-                title="Return to Customer Storefront"
-              >
-                <ArrowLeft size={14} />
-                <span>Storefront</span>
-              </button>
-            )}
-
-            {onNavigateToRewardsAdmin && (
-              <button 
-                onClick={onNavigateToRewardsAdmin}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 text-xs font-semibold text-amber-300 border border-amber-500/30 transition-all cursor-pointer"
-                title="Open Supabase Cyberwrap Rewards Admin Dashboard"
-              >
-                <Gift size={14} className="text-amber-400" />
-                <span>Rewards Admin</span>
-              </button>
-            )}
-
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
-                <Activity size={18} />
-              </div>
-              <div>
-                <h1 className="text-base md:text-lg font-black font-heading tracking-tight text-white flex items-center gap-2">
-                  DailyBread Live Analytics
-                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                    Realtime CMS
-                  </span>
-                </h1>
-                <p className="text-[11px] text-stone-400 font-mono">
-                  Schema: <code className="text-stone-300">public.analytics_events</code>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Status & Control Actions */}
-          <div className="flex flex-wrap items-center gap-2.5 text-xs">
-            
-            {/* Supabase Status Pill */}
-            <div 
-              onClick={() => setShowSqlModal(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border cursor-pointer transition-all ${
-                data?.isSupabaseConnected 
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20' 
-                  : 'bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20'
-              }`}
-              title="Click to view Supabase configuration & table SQL"
+      {/* Top Admin Navigation Bar */}
+      <header className="sticky top-0 z-40 bg-[#10141e]/90 backdrop-blur-md border-b border-slate-800/80 px-4 md:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
+        <div className="flex items-center gap-3">
+          {onBackToStore && (
+            <button
+              onClick={onBackToStore}
+              className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 px-3 py-1.5 rounded-lg transition-colors border border-slate-700/50 cursor-pointer"
             >
-              <Database size={13} />
-              <span className="font-semibold font-mono">
-                {data?.isSupabaseConnected ? 'Supabase: Connected' : 'Supabase: Ready (Demo Engine)'}
+              <ArrowLeft size={14} />
+              <span>Back to Store</span>
+            </button>
+          )}
+
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <h1 className="text-base md:text-lg font-black font-heading tracking-tight text-white flex items-center gap-2">
+                <span>DailyBread Shawarma</span>
+                <span className="text-orange-400">× CyberWrap</span>
+              </h1>
+              <span className="text-[11px] bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded font-mono font-bold">
+                BUSINESS ANALYTICS
               </span>
-              <span className={`w-2 h-2 rounded-full ${data?.isSupabaseConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
             </div>
-
-            {/* Auto Refresh Toggle */}
-            <button
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-medium transition-all cursor-pointer ${
-                autoRefresh 
-                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-300 hover:bg-blue-500/20' 
-                  : 'bg-white/5 border-white/10 text-stone-400 hover:bg-white/10'
-              }`}
-              title="Toggle automatic 10-second polling"
-            >
-              <RefreshCw size={13} className={autoRefresh && isRefreshing ? 'animate-spin' : ''} />
-              <span>Auto-refresh</span>
-              {autoRefresh && (
-                <span className="font-mono bg-blue-500/30 text-blue-200 px-1.5 py-0.2 rounded text-[10px] font-bold">
-                  {refreshCountdown}s
-                </span>
-              )}
-            </button>
-
-            {/* Manual Refresh */}
-            <button
-              onClick={() => fetchData(true)}
-              disabled={isRefreshing}
-              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-stone-200 border border-white/10 transition-all cursor-pointer disabled:opacity-50"
-              title="Refresh Analytics Now"
-            >
-              <RefreshCw size={14} className={isRefreshing ? 'animate-spin text-orange-400' : ''} />
-            </button>
-
-            {/* Simulate Event Button */}
-            <button
-              onClick={() => setShowSimulateModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold transition-all shadow-md shadow-orange-500/20 cursor-pointer"
-            >
-              <PlusCircle size={14} />
-              <span>Log Event</span>
-            </button>
-
-            {/* SQL Setup Modal trigger */}
-            <button
-              onClick={() => setShowSqlModal(true)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-stone-300 border border-white/10 transition-all cursor-pointer"
-            >
-              <ShieldCheck size={14} className="text-stone-400" />
-              <span>SQL Schema</span>
-            </button>
+            <p className="text-[11px] text-slate-400">
+              Executive conversion funnel, game engagement, and reward attribution
+            </p>
           </div>
+        </div>
 
+        <div className="flex items-center gap-2.5">
+          {/* Switch to Rewards Admin */}
+          {onNavigateToRewardsAdmin && (
+            <button
+              onClick={onNavigateToRewardsAdmin}
+              className="flex items-center gap-1.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
+              title="Open Rewards & Coupon Inventory Dashboard"
+            >
+              <Gift size={14} className="text-amber-400" />
+              <span>Rewards Admin</span>
+            </button>
+          )}
+
+          {/* Simulate Event Modal Trigger */}
+          <button
+            onClick={() => setShowSimulateModal(true)}
+            className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-md transition-all cursor-pointer"
+          >
+            <PlusCircle size={14} />
+            <span className="hidden sm:inline">Simulate Event</span>
+          </button>
+
+          {/* Auto-Refresh Toggle */}
+          <button
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono transition-colors cursor-pointer border ${
+              autoRefresh 
+                ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30' 
+                : 'bg-slate-800/60 text-slate-400 border-slate-700'
+            }`}
+            title="Toggle Live Auto-Refresh (every 10s)"
+          >
+            <RefreshCw size={13} className={autoRefresh ? 'animate-spin' : ''} />
+            <span className="hidden md:inline">{autoRefresh ? `${refreshCountdown}s` : 'Paused'}</span>
+          </button>
+
+          {/* Manual Refresh */}
+          <button
+            onClick={() => fetchData(true)}
+            disabled={isRefreshing}
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 cursor-pointer disabled:opacity-50"
+            title="Refresh analytics data"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+          </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-6">
-        
-        {/* Action toast notification */}
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-8">
+
+        {/* Action Message Banner */}
         {actionMessage && (
-          <div className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between animate-fade-in shadow-lg">
-            <span className="flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-emerald-400" />
-              {actionMessage}
-            </span>
-            <button onClick={() => setActionMessage(null)} className="text-emerald-300 hover:text-white">✕</button>
+          <div className="bg-emerald-900/40 border border-emerald-500/40 text-emerald-300 px-4 py-2.5 rounded-xl text-xs flex items-center justify-between animate-fade-in font-mono">
+            <span>✓ {actionMessage}</span>
+            <button onClick={() => setActionMessage(null)} className="text-emerald-400 hover:text-white">✕</button>
           </div>
         )}
 
-        {/* Supabase connection banner (if using demo mode or table pending) */}
-        {!data?.isSupabaseConnected && (
-          <div className="bg-[#1c1f26] border border-amber-500/30 p-4 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 shrink-0">
-                <AlertTriangle size={18} />
-              </div>
-              <div className="space-y-1">
-                <h3 className="font-bold text-amber-200 text-sm">
-                  {data?.isSupabaseConfigured 
-                    ? 'Supabase Credentials Detected — Table Sync Ready' 
-                    : 'Supabase Server Connection Standby'}
-                </h3>
-                <p className="text-stone-400 leading-relaxed max-w-2xl">
-                  {data?.isSupabaseConfigured
-                    ? `Connected to Supabase URL. If table public.analytics_events hasn't been created yet, click "SQL Schema" to initialize it.`
-                    : `Provide SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your server environment to stream straight to your remote database. Currently serving through real-time in-memory simulation engine.`}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
-              <button
-                onClick={handleSeedData}
-                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-stone-200 border border-white/10 font-semibold transition-all cursor-pointer"
-              >
-                + Seed 25 Events
-              </button>
-              <button
-                onClick={() => setShowSqlModal(true)}
-                className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-semibold transition-all cursor-pointer"
-              >
-                View SQL Script
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Global Filter Bar */}
-        <section className="bg-[#161b22] border border-white/10 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3 text-xs w-full md:w-auto">
-            
-            {/* Campaign Filter Dropdown */}
-            <div className="flex items-center gap-2">
-              <span className="text-stone-400 font-medium">Campaign:</span>
-              <select
-                value={selectedCampaign}
-                onChange={(e) => setSelectedCampaign(e.target.value)}
-                className="bg-[#0d1117] border border-white/15 text-stone-200 rounded-lg px-3 py-1.5 font-medium focus:outline-none focus:border-orange-500 cursor-pointer"
-              >
-                <option value="all">🌟 All Campaigns</option>
-                <option value="Summer Shawarma Splash">Summer Shawarma Splash</option>
-                <option value="Student Special Buea">Student Special Buea</option>
-                <option value="Weekend Feast Bokwaongo">Weekend Feast Bokwaongo</option>
-                <option value="Zobo Loyalty Blast">Zobo Loyalty Blast</option>
-                <option value="Independence Promo">Independence Promo</option>
-              </select>
+        {/* Filters Bar: Campaign, Source & Game Mode */}
+        <section className="bg-[#121722] border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 font-bold uppercase tracking-wider font-mono">
+              <Filter size={14} className="text-orange-400" />
+              <span>Filters:</span>
             </div>
 
-            {/* Event Type Filter */}
-            <div className="flex items-center gap-2">
-              <span className="text-stone-400 font-medium">Event:</span>
-              <select
-                value={selectedEvent}
-                onChange={(e) => setSelectedEvent(e.target.value)}
-                className="bg-[#0d1117] border border-white/15 text-stone-200 rounded-lg px-3 py-1.5 font-medium focus:outline-none focus:border-orange-500 cursor-pointer"
-              >
-                <option value="all">⚡ All Events</option>
-                <option value="game_played">🎮 game_played</option>
-                <option value="coupon_earned">🎟️ coupon_earned</option>
-                <option value="coupon_redeemed">🔥 coupon_redeemed</option>
-                <option value="3d_ar_opened">👓 3d_ar_opened</option>
-                <option value="order_initiated">🛒 order_initiated</option>
-              </select>
-            </div>
+            {/* Campaign Select */}
+            <select
+              value={selectedCampaign}
+              onChange={(e) => setSelectedCampaign(e.target.value)}
+              className="bg-[#0a0d14] border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500 cursor-pointer"
+            >
+              <option value="all">All Campaigns</option>
+              <option value="dailybread-cyberwrap">dailybread-cyberwrap</option>
+              <option value="cyberwrap-september">cyberwrap-september</option>
+              <option value="Summer Shawarma Splash">Summer Shawarma Splash</option>
+            </select>
 
+            {/* Source Select */}
+            <select
+              value={selectedSource}
+              onChange={(e) => setSelectedSource(e.target.value)}
+              className="bg-[#0a0d14] border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500 cursor-pointer"
+            >
+              <option value="all">All Sources</option>
+              <option value="website">Website (Homepage)</option>
+              <option value="instagram">Instagram</option>
+              <option value="qr_table">QR Table</option>
+              <option value="qr_counter">QR Counter</option>
+              <option value="qr_receipt">QR Receipt</option>
+              <option value="qr_delivery">QR Delivery</option>
+              <option value="social">Social</option>
+              <option value="direct">Direct</option>
+            </select>
+
+            {/* Game Mode Select */}
+            <select
+              value={selectedGameMode}
+              onChange={(e) => setSelectedGameMode(e.target.value as GameModeFilter)}
+              className="bg-[#0a0d14] border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-orange-500 cursor-pointer"
+            >
+              <option value="all">All Game Modes</option>
+              <option value="challenge">Challenge Mode (Rewards Active)</option>
+              <option value="free_roam">Free Roam (No Points)</option>
+            </select>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-stone-400 font-mono w-full md:w-auto justify-between md:justify-end">
-            <span>Last Sync: {data?.lastUpdated ? new Date(data.lastUpdated).toLocaleTimeString() : '--:--:--'}</span>
-            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-stone-300">
-              Source: {data?.dataSource === 'supabase' ? 'Supabase Table' : 'Realtime Memory Engine'}
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-400 font-mono">
+              Source: <strong className={data?.dataSource === 'supabase' ? 'text-emerald-400' : 'text-amber-400'}>
+                {data?.dataSource === 'supabase' ? 'Supabase Live' : 'Simulated In-Memory'}
+              </strong>
             </span>
+            <button
+              onClick={() => setShowSqlModal(true)}
+              className="text-xs text-slate-400 hover:text-slate-200 underline font-mono cursor-pointer"
+            >
+              Schema DDL
+            </button>
           </div>
         </section>
 
-        {/* 1. KPI Cards (4 metrics required) */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          {/* Total Events */}
-          <div className="bg-[#161b22] border border-white/10 p-5 rounded-2xl space-y-3 relative overflow-hidden group hover:border-orange-500/40 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-400 uppercase tracking-wider font-mono">Total Events</span>
-              <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400">
-                <Activity size={18} />
-              </div>
+        {/* 1. EXECUTIVE OVERVIEW (Top KPI Cards) */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 font-mono flex items-center gap-2">
+              <Sparkles size={16} className="text-orange-400" />
+              <span>1. Executive Overview</span>
+            </h2>
+            <span className="text-xs text-slate-500 font-mono">High-Level Performance</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">
+            {/* Monthly Players */}
+            <div className="bg-[#121722] border border-slate-800 rounded-2xl p-4 space-y-1">
+              <span className="text-[11px] font-mono uppercase text-slate-400 block">Monthly Players</span>
+              <div className="text-2xl font-black font-mono text-white">{executiveKPIs.monthlyPlayers}</div>
+              <span className="text-[10px] text-slate-500 block">Unique visitors / drivers</span>
             </div>
-            <div className="space-y-1">
-              <div className="text-3xl font-black font-heading text-white tracking-tight">
-                {data?.kpis.totalEvents ?? 0}
-              </div>
-              <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-                <ArrowUpRight size={14} />
-                <span>Live recorded actions</span>
-              </div>
+
+            {/* Challenges Completed */}
+            <div className="bg-[#121722] border border-slate-800 rounded-2xl p-4 space-y-1">
+              <span className="text-[11px] font-mono uppercase text-slate-400 block">Challenges Done</span>
+              <div className="text-2xl font-black font-mono text-blue-400">{executiveKPIs.challengesCompleted}</div>
+              <span className="text-[10px] text-slate-500 block">Completed runs</span>
             </div>
-            <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-              <div className="bg-orange-500 h-full w-4/5 rounded-full" />
+
+            {/* Players Receiving Coupons */}
+            <div className="bg-[#121722] border border-slate-800 rounded-2xl p-4 space-y-1">
+              <span className="text-[11px] font-mono uppercase text-slate-400 block">Players Awarded</span>
+              <div className="text-2xl font-black font-mono text-amber-400">{executiveKPIs.playersReceivingCoupons}</div>
+              <span className="text-[10px] text-slate-500 block">Hit 200 pts milestone</span>
+            </div>
+
+            {/* Coupons Generated */}
+            <div className="bg-[#121722] border border-slate-800 rounded-2xl p-4 space-y-1">
+              <span className="text-[11px] font-mono uppercase text-slate-400 block">Coupons Issued</span>
+              <div className="text-2xl font-black font-mono text-emerald-400">{executiveKPIs.couponsGenerated}</div>
+              <span className="text-[10px] text-slate-500 block">Unique 20% codes</span>
+            </div>
+
+            {/* Coupons Redeemed */}
+            <div className="bg-[#121722] border border-slate-800 rounded-2xl p-4 space-y-1">
+              <span className="text-[11px] font-mono uppercase text-slate-400 block">Coupons Redeemed</span>
+              <div className="text-2xl font-black font-mono text-purple-400">{executiveKPIs.couponsRedeemed}</div>
+              <span className="text-[10px] text-slate-500 block">Applied in checkout</span>
+            </div>
+
+            {/* Incremental Orders / WhatsApp Order Intent */}
+            <div className="bg-[#121722] border border-slate-800 rounded-2xl p-4 space-y-1">
+              <span className="text-[11px] font-mono uppercase text-slate-400 block">WhatsApp Order Intent</span>
+              <div className="text-2xl font-black font-mono text-orange-400">{executiveKPIs.incrementalOrders}</div>
+              <span className="text-[10px] text-amber-400/80 font-mono block">Order Intent (Not Confirmed)</span>
+            </div>
+
+            {/* Incremental Revenue */}
+            <div className="bg-[#121722] border border-slate-800 rounded-2xl p-4 space-y-1">
+              <span className="text-[11px] font-mono uppercase text-slate-400 block">Revenue Attribution</span>
+              <div className="text-xs font-bold font-mono text-amber-300 mt-2 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded text-center">
+                Pending Confirmation
+              </div>
+              <span className="text-[10px] text-slate-500 block text-center">WhatsApp intent only</span>
             </div>
           </div>
 
-          {/* Total Unique Sessions */}
-          <div className="bg-[#161b22] border border-white/10 p-5 rounded-2xl space-y-3 relative overflow-hidden group hover:border-blue-500/40 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-400 uppercase tracking-wider font-mono">Unique Sessions</span>
-              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400">
-                <Users size={18} />
+          {/* Cross-Journey & Website Acquisition KPIs */}
+          <div className="bg-[#121722]/80 border border-slate-800 rounded-2xl p-4 sm:p-5 mt-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300 font-mono">
+                <Layers size={15} className="text-emerald-400" />
+                <span>Website & Cross-Journey Attribution (Daily Run ↔ WhatsApp)</span>
               </div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-3xl font-black font-heading text-white tracking-tight">
-                {data?.kpis.totalUniqueSessions ?? 0}
-              </div>
-              <div className="text-[11px] text-stone-400">
-                Distinct <code className="text-blue-300">session_id</code> count
-              </div>
-            </div>
-            <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-              <div className="bg-blue-500 h-full w-3/5 rounded-full" />
-            </div>
-          </div>
-
-          {/* Total Coupons Earned */}
-          <div className="bg-[#161b22] border border-white/10 p-5 rounded-2xl space-y-3 relative overflow-hidden group hover:border-amber-500/40 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-400 uppercase tracking-wider font-mono">Coupons Earned</span>
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
-                <Ticket size={18} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-3xl font-black font-heading text-amber-300 tracking-tight">
-                {data?.kpis.totalCouponsEarned ?? 0}
-              </div>
-              <div className="text-[11px] text-amber-400/80 font-medium">
-                Issued via games & promos
-              </div>
-            </div>
-            <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-              <div className="bg-amber-400 h-full w-2/3 rounded-full" />
-            </div>
-          </div>
-
-          {/* Total Coupons Redeemed */}
-          <div className="bg-[#161b22] border border-white/10 p-5 rounded-2xl space-y-3 relative overflow-hidden group hover:border-emerald-500/40 transition-all">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-stone-400 uppercase tracking-wider font-mono">Coupons Redeemed</span>
-              <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
-                <Gift size={18} />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div className="text-3xl font-black font-heading text-emerald-300 tracking-tight">
-                {data?.kpis.totalCouponsRedeemed ?? 0}
-              </div>
-              <div className="text-[11px] text-emerald-400 font-semibold">
-                Conversion Rate: {data?.kpis.redemptionRate ?? 0}%
-              </div>
-            </div>
-            <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-              <div className="bg-emerald-400 h-full w-1/2 rounded-full" />
-            </div>
-          </div>
-
-        </section>
-
-        {/* 2. Charts Section (3 required: Bar chart, Line chart, Pie chart) */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* Chart 1: Bar Chart - Event Frequency */}
-          <div className="lg:col-span-6 bg-[#161b22] border border-white/10 p-5 rounded-2xl space-y-4 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-white font-heading flex items-center gap-2">
-                  <Flame size={16} className="text-orange-400" />
-                  Event Frequency by Name
-                </h3>
-                <p className="text-xs text-stone-400">Total occurrences grouped by <code className="text-stone-300">event</code> column</p>
-              </div>
-              <span className="text-[11px] font-mono text-stone-400 bg-white/5 px-2 py-1 rounded">Bar Chart</span>
+              <span className="text-[11px] font-mono text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+                Distinguishing Order Intent from Confirmed Orders
+              </span>
             </div>
 
-            <div className="h-64 w-full pt-2">
-              {data?.eventFrequency && data.eventFrequency.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.eventFrequency} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                    <XAxis 
-                      dataKey="displayName" 
-                      stroke="#8b949e" 
-                      fontSize={11} 
-                      tickLine={false} 
-                      interval={0}
-                      angle={-20}
-                      textAnchor="end"
-                    />
-                    <YAxis stroke="#8b949e" fontSize={11} tickLine={false} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#1f242c', borderColor: '#30363d', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-                      formatter={(val: any) => [`${val} events`, 'Frequency']}
-                    />
-                    <Bar dataKey="count" fill="#f97316" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-xs text-stone-500">
-                  No event records found for current filter.
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-1">
+              <div className="bg-[#0a0d14] border border-slate-800/80 rounded-xl p-3">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Unique Visitors</span>
+                <div className="text-lg font-black font-mono text-white">
+                  {data?.websiteKPIs?.uniqueVisitors ?? data?.kpis?.totalUniqueSessions ?? 1}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Chart 2: Pie / Donut Chart - Campaign Distribution */}
-          <div className="lg:col-span-6 bg-[#161b22] border border-white/10 p-5 rounded-2xl space-y-4 shadow-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-white font-heading flex items-center gap-2">
-                  <Layers size={16} className="text-blue-400" />
-                  Campaign Distribution
-                </h3>
-                <p className="text-xs text-stone-400">Share of engagement across marketing campaigns</p>
+                <span className="text-[10px] text-slate-500">Persistent browser ID</span>
               </div>
-              <span className="text-[11px] font-mono text-stone-400 bg-white/5 px-2 py-1 rounded">Pie Chart</span>
-            </div>
 
-            <div className="h-64 w-full flex items-center justify-center">
-              {data?.campaignDistribution && data.campaignDistribution.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={data.campaignDistribution}
-                      dataKey="count"
-                      nameKey="campaign"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={4}
-                    >
-                      {data.campaignDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color || CAMPAIGN_COLORS[index % CAMPAIGN_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#1f242c', borderColor: '#30363d', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-                      formatter={(value: any, name: any, item: any) => [`${value} events (${item.payload.percentage}%)`, name]}
-                    />
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36} 
-                      formatter={(val) => <span className="text-[11px] text-stone-300">{val}</span>}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-xs text-stone-500">No campaign data available.</div>
-              )}
-            </div>
-          </div>
-
-          {/* Chart 3: Line / Area Chart - Event Volume Over Time */}
-          <div className="lg:col-span-12 bg-[#161b22] border border-white/10 p-5 rounded-2xl space-y-4 shadow-lg">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-bold text-white font-heading flex items-center gap-2">
-                  <Activity size={16} className="text-emerald-400" />
-                  Event Volume Timeline (<code className="text-emerald-300 font-mono">created_at</code>)
-                </h3>
-                <p className="text-xs text-stone-400">Time-series tracking of total actions, games played, coupons earned & redeemed</p>
-              </div>
-              <div className="flex items-center gap-3 text-[11px] text-stone-400">
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /> Total Volume</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400" /> Coupons Earned</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-400" /> Games Played</span>
-              </div>
-            </div>
-
-            <div className="h-64 w-full pt-2">
-              {data?.volumeOverTime && data.volumeOverTime.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.volumeOverTime} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0}/>
-                      </linearGradient>
-                      <linearGradient id="colorCoupons" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                    <XAxis dataKey="formattedTime" stroke="#8b949e" fontSize={11} tickLine={false} />
-                    <YAxis stroke="#8b949e" fontSize={11} tickLine={false} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#1f242c', borderColor: '#30363d', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
-                    />
-                    <Area type="monotone" dataKey="count" name="Total Events" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorTotal)" />
-                    <Area type="monotone" dataKey="couponsEarned" name="Coupons Earned" stroke="#f59e0b" strokeWidth={2} fillOpacity={1} fill="url(#colorCoupons)" />
-                    <Area type="monotone" dataKey="games" name="Games Played" stroke="#3b82f6" strokeWidth={1.5} fillOpacity={0} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-xs text-stone-500">
-                  No timeline data logged yet.
+              <div className="bg-[#0a0d14] border border-slate-800/80 rounded-xl p-3">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Browsing Sessions</span>
+                <div className="text-lg font-black font-mono text-blue-400">
+                  {data?.websiteKPIs?.totalSessions ?? data?.kpis?.totalUniqueSessions ?? 1}
                 </div>
-              )}
+                <span className="text-[10px] text-slate-500">Website visits</span>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800/80 rounded-xl p-3">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Menu Views</span>
+                <div className="text-lg font-black font-mono text-amber-400">
+                  {data?.websiteKPIs?.menuViews ?? 0}
+                </div>
+                <span className="text-[10px] text-slate-500">Menu interactions</span>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800/80 rounded-xl p-3">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Daily Run Intent</span>
+                <div className="text-lg font-black font-mono text-emerald-400">
+                  {data?.crossJourneyKPIs?.dailyRunToWhatsAppIntent ?? 0}
+                </div>
+                <span className="text-[10px] text-slate-500">Played Run ➔ WhatsApp</span>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800/80 rounded-xl p-3">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Post-Order Play CTA</span>
+                <div className="text-lg font-black font-mono text-purple-400">
+                  {data?.crossJourneyKPIs?.postOrderDailyRunStarts ?? 0}
+                </div>
+                <span className="text-[10px] text-slate-500">Ordered ➔ Played Run</span>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800/80 rounded-xl p-3">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Coupon-Assisted Intent</span>
+                <div className="text-lg font-black font-mono text-orange-400">
+                  {data?.crossJourneyKPIs?.couponAssistedOrderIntent ?? 0}
+                </div>
+                <span className="text-[10px] text-slate-500">Orders with coupon code</span>
+              </div>
             </div>
           </div>
-
         </section>
 
-        {/* 3. Interactive Data Table: Raw Event Logs */}
-        <section className="bg-[#161b22] border border-white/10 rounded-2xl overflow-hidden shadow-xl space-y-4 p-5">
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* 2. CONVERSION FUNNEL */}
+        <section className="bg-[#121722] border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
             <div>
               <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
-                <Database size={17} className="text-orange-400" />
-                Raw Analytics Event Logs (<code className="text-stone-300 font-mono">public.analytics_events</code>)
+                <TrendingUp size={18} className="text-orange-400" />
+                <span>2. CyberWrap Conversion Funnel</span>
               </h3>
-              <p className="text-xs text-stone-400">
-                Sorted by <code className="text-stone-300">created_at</code> descending. Total matching events: <span className="text-white font-bold">{filteredEvents.length}</span>
+              <p className="text-xs text-slate-400">
+                End-to-end user conversion from initial WebGL run to restaurant coupon redemption
+              </p>
+            </div>
+            <div className="text-xs font-mono text-slate-400 bg-slate-800/60 px-3 py-1 rounded-lg">
+              Goal: 200 PTS ➔ 20% Coupon ➔ Shawarma Order
+            </div>
+          </div>
+
+          {/* Stepped Funnel Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+            {funnelSteps.map((step, index) => (
+              <div 
+                key={step.id} 
+                className="bg-[#0a0d14] border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between relative overflow-hidden"
+              >
+                {/* Step Index Pill */}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono text-slate-500 font-bold">0{index + 1}</span>
+                  {step.isPendingAttribution ? (
+                    <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                      Pending
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                      {step.stepConversionRate}%
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-1 my-1">
+                  <div className="text-xs font-bold text-slate-200 line-clamp-1" title={step.name}>
+                    {step.name}
+                  </div>
+                  <div className="text-xl font-black font-mono text-white">
+                    {step.isPendingAttribution && step.count === 0 ? '—' : step.count}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-800/80 mt-2 text-[10px] font-mono text-slate-400">
+                  {step.isPendingAttribution ? (
+                    <span className="text-amber-400/90">{step.notes}</span>
+                  ) : (
+                    <span>{step.dropOffRate > 0 ? `-${step.dropOffRate}% drop` : 'Baseline'}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-amber-950/20 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-200/90 flex items-start gap-2.5">
+            <Info size={16} className="text-amber-400 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">
+              <strong>Funnel Attribution Note:</strong> Conversion percentages are calculated strictly from recorded database events. Because DailyBread utilizes WhatsApp-mediated ordering, final cash/Momo restaurant receipts and repeat customer orders are handled offline and marked as <em>Attribution pending</em> until direct POS webhooks are linked.
+            </p>
+          </div>
+        </section>
+
+        {/* 3 & 4. REVENUE IMPACT & PLAYER ENGAGEMENT (Two Columns) */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* 3. Revenue Impact */}
+          <div className="lg:col-span-6 bg-[#121722] border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4 flex flex-col justify-between">
+            <div className="border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+                <DollarSign size={18} className="text-emerald-400" />
+                <span>3. Revenue Impact</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Financial incrementality generated via CyberWrap rewards
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Search input */}
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input
-                  type="text"
-                  placeholder="Search session, event, payload..."
-                  value={searchQuery}
-                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                  className="bg-[#0d1117] border border-white/15 text-stone-200 text-xs rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:border-orange-500 w-48 sm:w-60"
-                />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-4 space-y-1">
+                <span className="text-xs font-mono uppercase text-slate-400">Incremental Revenue</span>
+                <div className="text-sm font-bold font-mono text-amber-300 py-1">
+                  Order attribution not yet available
+                </div>
+                <span className="text-[10px] text-slate-500">Requires POS payment sync</span>
               </div>
 
-              {/* Export CSV button */}
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-4 space-y-1">
+                <span className="text-xs font-mono uppercase text-slate-400">Initiated Orders</span>
+                <div className="text-2xl font-black font-mono text-white">
+                  {executiveKPIs.incrementalOrders}
+                </div>
+                <span className="text-[10px] text-slate-500">WhatsApp checkout clicks</span>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-4 space-y-1">
+                <span className="text-xs font-mono uppercase text-slate-400">Avg Incremental Order</span>
+                <div className="text-sm font-bold font-mono text-amber-300 py-1">
+                  Order attribution not yet available
+                </div>
+                <span className="text-[10px] text-slate-500">Pending final receipt amounts</span>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-4 space-y-1">
+                <span className="text-xs font-mono uppercase text-slate-400">Coupon Redemption Rate</span>
+                <div className="text-2xl font-black font-mono text-emerald-400">
+                  {rewardsMetrics?.redemptionRate ?? data?.kpis?.redemptionRate ?? 0}%
+                </div>
+                <span className="text-[10px] text-slate-500">Claimed vs Issued</span>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-slate-400 bg-slate-800/40 p-2.5 rounded-lg border border-slate-700/50">
+              💡 <em>To enable exact revenue tracking, restaurant staff can record coupon redemption receipts in the Rewards Admin.</em>
+            </div>
+          </div>
+
+          {/* 4. Player Engagement */}
+          <div className="lg:col-span-6 bg-[#121722] border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+            <div className="border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+                <Users size={18} className="text-blue-400" />
+                <span>4. Player Engagement</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Gameplay session depth, scores, and completion behaviors
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-3">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Unique Sessions</span>
+                <div className="text-lg font-black font-mono text-white">{engagementMetrics.uniqueSessions}</div>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-3">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Avg Sessions/Player</span>
+                <div className="text-lg font-black font-mono text-blue-400">{engagementMetrics.avgSessionsPerPlayer}</div>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-3">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Avg Duration</span>
+                <div className="text-lg font-black font-mono text-amber-400">{engagementMetrics.avgPlayDurationSec}s</div>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-3">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Avg Score</span>
+                <div className="text-lg font-black font-mono text-emerald-400">{engagementMetrics.avgScore} pts</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 pt-1">
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-3 text-center">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block mb-1">Challenge Finish Rate</span>
+                <div className="text-xl font-black font-mono text-white">{engagementMetrics.challengeCompletionRate}%</div>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-3 text-center">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block mb-1">200 Pts Rate</span>
+                <div className="text-xl font-black font-mono text-orange-400">{engagementMetrics.thresholdAchievementRate}%</div>
+              </div>
+
+              <div className="bg-[#0a0d14] border border-slate-800 rounded-xl p-3 text-center">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block mb-1">Returning Players</span>
+                <div className="text-xl font-black font-mono text-purple-400">{engagementMetrics.returningPlayers}</div>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        {/* 5 & 6. REWARD PERFORMANCE & ACQUISITION SOURCES */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          {/* 5. Reward Performance */}
+          <div className="lg:col-span-5 bg-[#121722] border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+            <div className="border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+                <Ticket size={18} className="text-amber-400" />
+                <span>5. Reward Performance</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Authoritative backend coupon lifecycle (7-day validity)
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center bg-[#0a0d14] border border-slate-800 p-3 rounded-xl">
+                <span className="text-xs text-slate-300 font-mono">Total Coupons Generated</span>
+                <span className="text-sm font-bold font-mono text-white">
+                  {rewardsMetrics?.totalCoupons ?? executiveKPIs.couponsGenerated}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center bg-[#0a0d14] border border-slate-800 p-3 rounded-xl">
+                <span className="text-xs text-slate-300 font-mono">Active Coupons (Unused)</span>
+                <span className="text-sm font-bold font-mono text-emerald-400">
+                  {rewardsMetrics?.activeCoupons ?? Math.max(0, executiveKPIs.couponsGenerated - executiveKPIs.couponsRedeemed)}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center bg-[#0a0d14] border border-slate-800 p-3 rounded-xl">
+                <span className="text-xs text-slate-300 font-mono">Redeemed in Restaurant</span>
+                <span className="text-sm font-bold font-mono text-purple-400">
+                  {rewardsMetrics?.redeemedCoupons ?? executiveKPIs.couponsRedeemed}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center bg-[#0a0d14] border border-slate-800 p-3 rounded-xl">
+                <span className="text-xs text-slate-300 font-mono">Expired After 7 Days</span>
+                <span className="text-sm font-bold font-mono text-red-400">
+                  {rewardsMetrics?.expiredCoupons ?? 0}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center bg-emerald-950/20 border border-emerald-500/30 p-3 rounded-xl">
+                <span className="text-xs text-emerald-300 font-mono font-bold">Overall Redemption Rate</span>
+                <span className="text-base font-black font-mono text-emerald-400">
+                  {rewardsMetrics?.redemptionRate ?? data?.kpis?.redemptionRate ?? 0}%
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 6. Acquisition Sources Breakdown */}
+          <div className="lg:col-span-7 bg-[#121722] border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+            <div className="border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+                <Compass size={18} className="text-cyan-400" />
+                <span>6. Acquisition Sources Performance</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Visitor attribution by touchpoint (Website, Instagram, QR Table/Counter/Receipt)
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 font-mono uppercase text-[10px]">
+                    <th className="py-2 px-2">Source</th>
+                    <th className="py-2 px-2 text-right">Visitors</th>
+                    <th className="py-2 px-2 text-right">Sessions</th>
+                    <th className="py-2 px-2 text-right">Game Starts</th>
+                    <th className="py-2 px-2 text-right">Challenges</th>
+                    <th className="py-2 px-2 text-right">Coupons</th>
+                    <th className="py-2 px-2 text-right">WhatsApp Intent</th>
+                    <th className="py-2 px-2 text-right">Conv %</th>
+                    <th className="py-2 px-2 text-right">Redemptions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {sourcePerformance.map((src) => (
+                    <tr key={src.source} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-2 px-2 font-bold text-slate-200">
+                        {src.displayName}
+                      </td>
+                      <td className="py-2 px-2 text-right text-slate-300">{src.visitors}</td>
+                      <td className="py-2 px-2 text-right text-slate-400">{src.sessions}</td>
+                      <td className="py-2 px-2 text-right text-blue-400">{src.gameStarts}</td>
+                      <td className="py-2 px-2 text-right text-amber-400">{src.challengesCompleted}</td>
+                      <td className="py-2 px-2 text-right text-emerald-400">{src.couponsEarned}</td>
+                      <td className="py-2 px-2 text-right text-orange-400 font-bold">{src.orderIntentCount}</td>
+                      <td className="py-2 px-2 text-right text-emerald-400">{src.conversionToWhatsAppIntent}%</td>
+                      <td className="py-2 px-2 text-right text-purple-400">{src.couponsRedeemed}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </section>
+
+        {/* 7 & 8. LIVE ACTIVITY & CHARTS */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+          {/* 8. Live Activity Feed */}
+          <div className="lg:col-span-5 bg-[#121722] border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+            <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+                  <Flame size={18} className="text-orange-400" />
+                  <span>8. Live Activity Stream</span>
+                </h3>
+                <p className="text-xs text-slate-400">Real-time actions in CyberWrap and DailyBread</p>
+              </div>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            </div>
+
+            <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+              {liveActivityFeed.length === 0 ? (
+                <div className="text-xs text-slate-500 py-6 text-center font-mono">
+                  No recent events recorded.
+                </div>
+              ) : (
+                liveActivityFeed.map((item) => (
+                  <div 
+                    key={item.id}
+                    className="bg-[#0a0d14] border border-slate-800/90 rounded-xl p-2.5 flex items-center gap-3"
+                  >
+                    <div className="p-2 rounded-lg bg-slate-800/80 shrink-0">
+                      {item.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-slate-200 capitalize truncate">
+                          {item.title}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500 shrink-0">
+                          {item.timestamp}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-mono truncate">
+                        {item.detail}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Volume Over Time Chart */}
+          <div className="lg:col-span-7 bg-[#121722] border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+            <div className="border-b border-slate-800 pb-3">
+              <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+                <Activity size={18} className="text-orange-400" />
+                <span>Event Volume Trends</span>
+              </h3>
+              <p className="text-xs text-slate-400">Total gameplay actions and rewards issued over time</p>
+            </div>
+
+            <div className="h-64 w-full">
+              {data?.volumeOverTime && data.volumeOverTime.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={data.volumeOverTime}>
+                    <defs>
+                      <linearGradient id="eventColor" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.4}/>
+                        <stop offset="95%" stopColor="#f97316" stopOpacity={0.0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
+                    <XAxis dataKey="formattedTime" stroke="#6e7681" fontSize={11} />
+                    <YAxis stroke="#6e7681" fontSize={11} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#161b22', borderColor: '#30363d', color: '#fff', fontSize: '12px' }} 
+                    />
+                    <Area type="monotone" dataKey="count" stroke="#f97316" fillOpacity={1} fill="url(#eventColor)" name="Total Events" />
+                    <Area type="monotone" dataKey="games" stroke="#3b82f6" fillOpacity={0} name="Games" />
+                    <Area type="monotone" dataKey="couponsEarned" stroke="#10b981" fillOpacity={0} name="Coupons Earned" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-slate-500 font-mono">
+                  Insufficient chronological data. Log events to populate graph.
+                </div>
+              )}
+            </div>
+          </div>
+
+        </section>
+
+        {/* 9. TECHNICAL EVENT EXPLORER (Detailed Logs) */}
+        <section className="bg-[#121722] border border-slate-800 rounded-2xl overflow-hidden shadow-xl space-y-4 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3">
+            <div>
+              <h3 className="text-base font-bold text-white font-heading flex items-center gap-2">
+                <Layers size={18} className="text-orange-400" />
+                <span>9. Technical Event Explorer</span>
+              </h3>
+              <p className="text-xs text-slate-400">
+                Raw audit logs with query search, JSON payload inspector, and CSV export
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleExportCSV}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-stone-300 border border-white/10 text-xs font-semibold transition-all cursor-pointer"
-                title="Download matching logs as CSV"
+                onClick={exportToCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 transition-all cursor-pointer"
               >
                 <Download size={13} />
                 <span>Export CSV</span>
@@ -753,162 +1156,159 @@ CREATE INDEX IF NOT EXISTS idx_analytics_event_campaign ON public.analytics_even
             </div>
           </div>
 
-          {/* Table Container */}
-          <div className="overflow-x-auto border border-white/10 rounded-xl">
+          {/* Search and event-type filter controls */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by session, event, campaign or payload..."
+                className="w-full bg-[#0a0d14] border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-orange-500 font-mono"
+              />
+            </div>
+
+            <select
+              value={selectedEvent}
+              onChange={(e) => setSelectedEvent(e.target.value)}
+              className="bg-[#0a0d14] border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-orange-500 font-mono cursor-pointer"
+            >
+              <option value="all">All Event Types</option>
+              <option value="game_started">game_started</option>
+              <option value="challenge_completed">challenge_completed</option>
+              <option value="reward_threshold_reached">reward_threshold_reached</option>
+              <option value="coupon_earned">coupon_earned</option>
+              <option value="coupon_viewed">coupon_viewed</option>
+              <option value="coupon_redeemed">coupon_redeemed</option>
+              <option value="order_initiated">order_initiated</option>
+              <option value="3d_ar_opened">3d_ar_opened</option>
+              <option value="cyberwrap_launch_clicked">cyberwrap_launch_clicked</option>
+              <option value="daily_run_section_viewed">daily_run_section_viewed</option>
+              <option value="daily_run_cta_clicked">daily_run_cta_clicked</option>
+            </select>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto border border-slate-800 rounded-xl">
             <table className="w-full text-left text-xs">
-              <thead className="bg-[#0d1117] text-stone-400 font-mono border-b border-white/10 uppercase tracking-wider text-[11px]">
+              <thead className="bg-[#0a0d14] text-slate-400 font-mono uppercase text-[10px] border-b border-slate-800">
                 <tr>
-                  <th className="py-3 px-4">ID</th>
-                  <th className="py-3 px-4">Created At</th>
-                  <th className="py-3 px-4">Event</th>
-                  <th className="py-3 px-4">Session ID</th>
-                  <th className="py-3 px-4">Campaign</th>
-                  <th className="py-3 px-4">Game Version</th>
-                  <th className="py-3 px-4">Data (JSONB)</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-2.5 px-3">ID</th>
+                  <th className="py-2.5 px-3">Event</th>
+                  <th className="py-2.5 px-3">Session</th>
+                  <th className="py-2.5 px-3">Campaign</th>
+                  <th className="py-2.5 px-3">Metadata</th>
+                  <th className="py-2.5 px-3">Logged At</th>
+                  <th className="py-2.5 px-3 text-right">Inspect</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 font-sans">
-                {paginatedEvents.length > 0 ? (
+              <tbody className="divide-y divide-slate-800 font-mono">
+                {paginatedEvents.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-500 text-xs">
+                      No analytics events found matching filters.
+                    </td>
+                  </tr>
+                ) : (
                   paginatedEvents.map((ev) => (
-                    <tr key={ev.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="py-3 px-4 font-mono text-stone-400 text-[11px]">#{ev.id}</td>
-                      <td className="py-3 px-4 font-mono text-stone-300 text-[11px] whitespace-nowrap">
-                        {new Date(ev.created_at).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit'
-                        })}
+                    <tr key={ev.id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="py-2.5 px-3 text-slate-500 text-[11px]">#{ev.id}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="font-bold text-orange-400">{ev.event}</span>
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {getEventBadge(ev.event)}
+                      <td className="py-2.5 px-3 text-slate-300">{ev.session_id}</td>
+                      <td className="py-2.5 px-3 text-slate-400">{ev.campaign}</td>
+                      <td className="py-2.5 px-3 text-slate-400 max-w-[200px] truncate text-[11px]">
+                        {JSON.stringify(ev.data || {})}
                       </td>
-                      <td className="py-3 px-4 font-mono text-blue-300 text-[11px] whitespace-nowrap">
-                        {ev.session_id}
+                      <td className="py-2.5 px-3 text-slate-400 text-[11px]">
+                        {new Date(ev.created_at).toLocaleString()}
                       </td>
-                      <td className="py-3 px-4 text-stone-300 font-medium">
-                        {ev.campaign}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-stone-400 text-[11px]">
-                        {ev.game_version || 'v1.0.0'}
-                      </td>
-                      <td className="py-3 px-4 max-w-xs truncate font-mono text-[11px] text-stone-400">
-                        {ev.data ? JSON.stringify(ev.data) : '{}'}
-                      </td>
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                      <td className="py-2.5 px-3 text-right">
                         <button
                           onClick={() => setSelectedEventForDetail(ev)}
-                          className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-orange-300 border border-white/10 text-[11px] font-semibold transition-all cursor-pointer inline-flex items-center gap-1"
+                          className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700 transition-colors cursor-pointer"
+                          title="View JSON Payload"
                         >
-                          <Eye size={12} />
-                          Inspect
+                          <Eye size={14} />
                         </button>
                       </td>
                     </tr>
                   ))
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-stone-500">
-                      No matching events found. Try adjusting your search query or campaign filter.
-                    </td>
-                  </tr>
                 )}
               </tbody>
             </table>
           </div>
 
-          {/* Pagination bar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-400 pt-2 font-mono">
-            <div className="flex items-center gap-2">
-              <span>Showing {filteredEvents.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(currentPage * pageSize, filteredEvents.length)} of {filteredEvents.length} logs</span>
-              <span>•</span>
-              <span>Rows per page:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                className="bg-[#0d1117] border border-white/15 text-stone-300 rounded px-2 py-1 text-xs"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-              </select>
+          {/* Pagination Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400 font-mono pt-2">
+            <div>
+              Showing {paginatedEvents.length} of {filteredEvents.length} filtered records
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-stone-300 border border-white/10 transition-all cursor-pointer"
+                disabled={currentPage <= 1}
+                className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 transition-colors cursor-pointer"
               >
                 Previous
               </button>
-              <span className="px-3 py-1 rounded bg-white/10 text-stone-200 font-bold">
-                Page {currentPage} / {totalPages}
-              </span>
+              <span>Page {currentPage} of {totalPages}</span>
               <button
                 onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
                 disabled={currentPage >= totalPages}
-                className="px-3 py-1 rounded bg-white/5 hover:bg-white/10 disabled:opacity-30 text-stone-300 border border-white/10 transition-all cursor-pointer"
+                className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-30 transition-colors cursor-pointer"
               >
                 Next
               </button>
             </div>
           </div>
-
         </section>
 
       </main>
 
       {/* SQL Setup Modal */}
       {showSqlModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-white/15 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#121722] border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Database size={20} className="text-emerald-400" />
-                <h3 className="text-lg font-bold text-white font-heading">Supabase SQL Table Schema</h3>
+                <h3 className="text-base font-bold text-white font-heading">Supabase SQL Table Schema</h3>
               </div>
               <button 
                 onClick={() => setShowSqlModal(false)}
-                className="text-stone-400 hover:text-white text-lg p-1"
+                className="text-slate-400 hover:text-white text-lg p-1"
               >
                 ✕
               </button>
             </div>
 
-            <p className="text-xs text-stone-300 leading-relaxed">
-              To connect your live Supabase database, copy and run this SQL query in your <strong>Supabase SQL Editor</strong>, then set <code className="bg-black/40 text-orange-400 px-1 py-0.5 rounded">SUPABASE_URL</code> and <code className="bg-black/40 text-orange-400 px-1 py-0.5 rounded">SUPABASE_SERVICE_ROLE_KEY</code> in your environment:
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Database schema for analytics telemetry. Client inserts are permitted; SELECT permissions are restricted to authenticated admins:
             </p>
 
             <div className="relative">
-              <pre className="bg-[#0d1117] border border-white/10 p-4 rounded-xl text-xs font-mono text-stone-200 overflow-x-auto max-h-64 leading-relaxed">
+              <pre className="bg-[#0a0d14] border border-slate-800 p-4 rounded-xl text-xs font-mono text-slate-200 overflow-x-auto max-h-60 leading-relaxed">
 {`-- Supabase Table: public.analytics_events
 CREATE TABLE IF NOT EXISTS public.analytics_events (
   id BIGSERIAL PRIMARY KEY,
   session_id TEXT NOT NULL,
-  campaign TEXT NOT NULL,
+  campaign TEXT NOT NULL DEFAULT 'dailybread-cyberwrap',
   event TEXT NOT NULL,
   timestamp BIGINT NOT NULL,
   game_version TEXT DEFAULT 'v1.4.2',
   data JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  player_id UUID NULL
 );
 
--- Enable Row Level Security (RLS)
 ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow server access to analytics_events"
-ON public.analytics_events FOR ALL
-USING (true) WITH CHECK (true);
-
--- Indices for rapid query performance
-CREATE INDEX IF NOT EXISTS idx_analytics_created_at 
-ON public.analytics_events (created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_analytics_event_campaign 
-ON public.analytics_events (event, campaign);`}
+CREATE POLICY "Allow public insert analytics" ON public.analytics_events FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow authenticated admins read analytics" ON public.analytics_events FOR SELECT TO authenticated USING (true);
+CREATE INDEX IF NOT EXISTS idx_analytics_created ON public.analytics_events (created_at DESC);`}
               </pre>
 
               <button
@@ -923,7 +1323,7 @@ ON public.analytics_events (event, campaign);`}
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setShowSqlModal(false)}
-                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-stone-200 text-xs font-bold transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all cursor-pointer"
               >
                 Close
               </button>
@@ -934,33 +1334,32 @@ ON public.analytics_events (event, campaign);`}
 
       {/* Inspect JSON Modal */}
       {selectedEventForDetail && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-white/15 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#121722] border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Eye size={18} className="text-orange-400" />
-                <h3 className="text-base font-bold text-white font-heading">Event Details #{selectedEventForDetail.id}</h3>
+                <h3 className="text-base font-bold text-white font-heading">Event #{selectedEventForDetail.id} Details</h3>
               </div>
               <button 
                 onClick={() => setSelectedEventForDetail(null)}
-                className="text-stone-400 hover:text-white text-lg p-1"
+                className="text-slate-400 hover:text-white text-lg p-1"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-2 bg-[#0d1117] p-3 rounded-xl border border-white/10 font-mono">
-                <div><span className="text-stone-500">Event:</span> <span className="text-orange-300 font-bold">{selectedEventForDetail.event}</span></div>
-                <div><span className="text-stone-500">Session:</span> <span className="text-blue-300">{selectedEventForDetail.session_id}</span></div>
-                <div><span className="text-stone-500">Campaign:</span> <span className="text-stone-200">{selectedEventForDetail.campaign}</span></div>
-                <div><span className="text-stone-500">Version:</span> <span className="text-stone-300">{selectedEventForDetail.game_version}</span></div>
-                <div className="col-span-2"><span className="text-stone-500">Created At:</span> <span className="text-stone-300">{selectedEventForDetail.created_at}</span></div>
+            <div className="space-y-2 text-xs font-mono">
+              <div className="grid grid-cols-2 gap-2 bg-[#0a0d14] p-3 rounded-xl border border-slate-800">
+                <div>Event: <strong className="text-orange-400">{selectedEventForDetail.event}</strong></div>
+                <div>Session: <strong className="text-slate-200">{selectedEventForDetail.session_id}</strong></div>
+                <div>Campaign: <strong className="text-blue-400">{selectedEventForDetail.campaign}</strong></div>
+                <div>Version: <strong className="text-emerald-400">{selectedEventForDetail.game_version}</strong></div>
               </div>
 
               <div>
-                <h4 className="text-[11px] uppercase font-bold text-stone-400 font-mono mb-1.5">Payload Data (JSONB):</h4>
-                <pre className="bg-[#0d1117] border border-white/10 p-3 rounded-xl text-xs font-mono text-emerald-400 overflow-x-auto max-h-48">
+                <span className="text-[11px] text-slate-400 block mb-1">Payload JSON:</span>
+                <pre className="bg-[#0a0d14] border border-slate-800 p-3 rounded-xl text-[11px] text-slate-300 overflow-x-auto max-h-48">
                   {JSON.stringify(selectedEventForDetail.data, null, 2)}
                 </pre>
               </div>
@@ -969,7 +1368,7 @@ ON public.analytics_events (event, campaign);`}
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setSelectedEventForDetail(null)}
-                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-stone-200 text-xs font-bold transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all cursor-pointer"
               >
                 Close
               </button>
@@ -980,110 +1379,79 @@ ON public.analytics_events (event, campaign);`}
 
       {/* Simulate Event Modal */}
       {showSimulateModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#161b22] border border-white/15 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#121722] border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <PlusCircle size={18} className="text-orange-400" />
-                <h3 className="text-base font-bold text-white font-heading">Log Real-Time Event</h3>
+                <h3 className="text-base font-bold text-white font-heading">Simulate Live Telemetry Event</h3>
               </div>
               <button 
                 onClick={() => setShowSimulateModal(false)}
-                className="text-stone-400 hover:text-white text-lg p-1"
+                className="text-slate-400 hover:text-white text-lg p-1"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSimulateEvent} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSimulateEvent} className="space-y-3 text-xs font-mono">
               <div>
-                <label className="block text-stone-400 font-medium mb-1">Event Type</label>
+                <label className="block text-slate-400 mb-1">Event Type</label>
                 <select
                   value={simForm.event}
                   onChange={(e) => setSimForm({ ...simForm, event: e.target.value })}
-                  className="w-full bg-[#0d1117] border border-white/15 text-stone-200 rounded-lg p-2.5 text-xs focus:outline-none focus:border-orange-500"
+                  className="w-full bg-[#0a0d14] border border-slate-700 rounded-xl px-3 py-2 text-white"
                 >
-                  <option value="coupon_earned">🎟️ coupon_earned</option>
-                  <option value="coupon_redeemed">🔥 coupon_redeemed</option>
-                  <option value="game_played">🎮 game_played</option>
-                  <option value="3d_ar_opened">👓 3d_ar_opened</option>
-                  <option value="order_initiated">🛒 order_initiated</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-stone-400 font-medium mb-1">Campaign</label>
-                <select
-                  value={simForm.campaign}
-                  onChange={(e) => setSimForm({ ...simForm, campaign: e.target.value })}
-                  className="w-full bg-[#0d1117] border border-white/15 text-stone-200 rounded-lg p-2.5 text-xs focus:outline-none focus:border-orange-500"
-                >
-                  <option value="Summer Shawarma Splash">Summer Shawarma Splash</option>
-                  <option value="Student Special Buea">Student Special Buea</option>
-                  <option value="Weekend Feast Bokwaongo">Weekend Feast Bokwaongo</option>
-                  <option value="Zobo Loyalty Blast">Zobo Loyalty Blast</option>
-                  <option value="Independence Promo">Independence Promo</option>
+                  <option value="game_started">game_started</option>
+                  <option value="challenge_completed">challenge_completed</option>
+                  <option value="reward_threshold_reached">reward_threshold_reached</option>
+                  <option value="coupon_earned">coupon_earned</option>
+                  <option value="coupon_viewed">coupon_viewed</option>
+                  <option value="coupon_redeemed">coupon_redeemed</option>
+                  <option value="order_initiated">order_initiated</option>
+                  <option value="3d_ar_opened">3d_ar_opened</option>
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-stone-400 font-medium mb-1">Session ID</label>
-                  <input
-                    type="text"
-                    value={simForm.session_id}
-                    onChange={(e) => setSimForm({ ...simForm, session_id: e.target.value })}
-                    className="w-full bg-[#0d1117] border border-white/15 text-stone-200 rounded-lg p-2 text-xs font-mono"
-                  />
+                  <label className="block text-slate-400 mb-1">Source</label>
+                  <select
+                    value={simForm.source}
+                    onChange={(e) => setSimForm({ ...simForm, source: e.target.value })}
+                    className="w-full bg-[#0a0d14] border border-slate-700 rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value="website">website</option>
+                    <option value="instagram">instagram</option>
+                    <option value="qr_table">qr_table</option>
+                    <option value="qr_counter">qr_counter</option>
+                    <option value="qr_receipt">qr_receipt</option>
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-stone-400 font-medium mb-1">Game Version</label>
+                  <label className="block text-slate-400 mb-1">Score</label>
                   <input
-                    type="text"
-                    value={simForm.game_version}
-                    onChange={(e) => setSimForm({ ...simForm, game_version: e.target.value })}
-                    className="w-full bg-[#0d1117] border border-white/15 text-stone-200 rounded-lg p-2 text-xs font-mono"
+                    type="number"
+                    value={simForm.score}
+                    onChange={(e) => setSimForm({ ...simForm, score: Number(e.target.value) })}
+                    className="w-full bg-[#0a0d14] border border-slate-700 rounded-xl px-3 py-2 text-white"
                   />
                 </div>
               </div>
 
-              {simForm.event === 'coupon_earned' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-stone-400 font-medium mb-1">Coupon Code</label>
-                    <input
-                      type="text"
-                      value={simForm.coupon_code}
-                      onChange={(e) => setSimForm({ ...simForm, coupon_code: e.target.value })}
-                      className="w-full bg-[#0d1117] border border-white/15 text-stone-200 rounded-lg p-2 text-xs font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-stone-400 font-medium mb-1">Discount</label>
-                    <input
-                      type="text"
-                      value={simForm.discount}
-                      onChange={(e) => setSimForm({ ...simForm, discount: e.target.value })}
-                      className="w-full bg-[#0d1117] border border-white/15 text-stone-200 rounded-lg p-2 text-xs"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+              <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
                   onClick={() => setShowSimulateModal(false)}
-                  className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-stone-300 text-xs font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-lg shadow-orange-500/20 cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold cursor-pointer"
                 >
-                  <PlusCircle size={14} />
-                  <span>Send to Supabase</span>
+                  Emit Event
                 </button>
               </div>
             </form>

@@ -54,14 +54,14 @@ export interface CyberwrapCoupon {
 
 /**
  * 4. cyberwrap_rewards
- * Aggregated rewards progress and score milestones for a player cycle (2,000 pts threshold).
+ * Aggregated rewards progress and score milestones for a player cycle (200 pts threshold).
  */
 export type RewardCycleStatus = 'in_progress' | 'claimed' | 'cycle_completed' | 'tier_achieved';
 
 export interface CyberwrapReward {
   id: string; // uuid (Primary Key)
   player_id: string; // uuid
-  cumulative_score: number; // int4 (0 - 2,000)
+  cumulative_score: number; // int4 (0 - 200)
   cycle_started_at: string; // timestamptz
   cycle_expires_at: string; // timestamptz (7-day cycle)
   coupons_earned_in_cycle: number; // int4 (max 2 per cycle)
@@ -121,8 +121,18 @@ export interface ClaimScoreResult {
   claim: CyberwrapRewardClaim;
   reward: CyberwrapReward;
   newCoupon?: CyberwrapCoupon | null;
+  newCoupons?: CyberwrapCoupon[];
   milestoneReached: boolean;
   message: string;
+}
+
+export interface PlayerRewardsResponse {
+  success: boolean;
+  reward: CyberwrapReward | null;
+  coupons: CyberwrapCoupon[];
+  claims?: CyberwrapRewardClaim[];
+  message?: string;
+  error?: string;
 }
 
 export interface AuthUserProfile {

@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -47,6 +48,11 @@ function isValidUuid(id?: string): boolean {
 
 function ensureUuid(id?: string): string {
   if (id && isValidUuid(id)) return id;
+  if (id && id.trim()) {
+    // Generate deterministic UUIDv4-like string from arbitrary string identifier
+    const hash = crypto.createHash('sha256').update(id.trim()).digest('hex');
+    return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+  }
   return crypto.randomUUID();
 }
 
@@ -71,10 +77,48 @@ CREATE TABLE IF NOT EXISTS public.analytics_events (
   game_version text NOT NULL DEFAULT 'v1.4.2',
   data jsonb DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
-  player_id uuid NULL
+  player_id uuid NULL,
+  game_mode text NULL,
+  visitor_id text NULL,
+  event_category text NULL,
+  source text NULL,
+  medium text NULL,
+  referrer text NULL,
+  page text NULL,
+  path text NULL
 );
 
--- 2. cyberwrap_rewards
+-- 2. analytics_visitors
+CREATE TABLE IF NOT EXISTS public.analytics_visitors (
+  visitor_id text PRIMARY KEY,
+  first_seen_at timestamptz NOT NULL DEFAULT now(),
+  last_seen_at timestamptz NOT NULL DEFAULT now(),
+  first_source text NULL,
+  first_medium text NULL,
+  first_campaign text NULL,
+  first_referrer text NULL,
+  first_landing_page text NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- 3. analytics_sessions
+CREATE TABLE IF NOT EXISTS public.analytics_sessions (
+  session_id text PRIMARY KEY,
+  visitor_id text NOT NULL,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  ended_at timestamptz NULL,
+  landing_page text NULL,
+  source text NULL,
+  medium text NULL,
+  campaign text NULL,
+  referrer text NULL,
+  device_type text NULL,
+  browser text NULL,
+  os text NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- 4. cyberwrap_rewards
 CREATE TABLE IF NOT EXISTS public.cyberwrap_rewards (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   player_id uuid NOT NULL UNIQUE,
@@ -87,7 +131,7 @@ CREATE TABLE IF NOT EXISTS public.cyberwrap_rewards (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- 3. cyberwrap_coupons
+-- 5. cyberwrap_coupons
 CREATE TABLE IF NOT EXISTS public.cyberwrap_coupons (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   player_id uuid NOT NULL,
@@ -101,7 +145,7 @@ CREATE TABLE IF NOT EXISTS public.cyberwrap_coupons (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- 4. cyberwrap_reward_claims
+-- 6. cyberwrap_reward_claims
 CREATE TABLE IF NOT EXISTS public.cyberwrap_reward_claims (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   player_id uuid NOT NULL,
@@ -116,6 +160,9 @@ CREATE TABLE IF NOT EXISTS public.cyberwrap_reward_claims (
 -- Indexes for lightning fast queries
 CREATE INDEX IF NOT EXISTS idx_analytics_events_created ON public.analytics_events(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_analytics_events_event ON public.analytics_events(event);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_visitor ON public.analytics_events(visitor_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_category ON public.analytics_events(event_category);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_source ON public.analytics_events(source);
 CREATE INDEX IF NOT EXISTS idx_coupons_status ON public.cyberwrap_coupons(status);
 CREATE INDEX IF NOT EXISTS idx_coupons_code ON public.cyberwrap_coupons(code_hash);
 CREATE INDEX IF NOT EXISTS idx_claims_player ON public.cyberwrap_reward_claims(player_id);
@@ -123,6 +170,8 @@ CREATE INDEX IF NOT EXISTS idx_claims_game_id ON public.cyberwrap_reward_claims(
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.analytics_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.analytics_visitors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.analytics_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cyberwrap_rewards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cyberwrap_coupons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cyberwrap_reward_claims ENABLE ROW LEVEL SECURITY;
@@ -130,6 +179,12 @@ ALTER TABLE public.cyberwrap_reward_claims ENABLE ROW LEVEL SECURITY;
 -- Allow Public anonymous inserts for analytics and claims via APIs
 CREATE POLICY "Allow public insert analytics" ON public.analytics_events FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public read analytics" ON public.analytics_events FOR SELECT USING (true);
+CREATE POLICY "Allow public insert visitors" ON public.analytics_visitors FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update visitors" ON public.analytics_visitors FOR UPDATE USING (true);
+CREATE POLICY "Allow public read visitors" ON public.analytics_visitors FOR SELECT USING (true);
+CREATE POLICY "Allow public insert sessions" ON public.analytics_sessions FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update sessions" ON public.analytics_sessions FOR UPDATE USING (true);
+CREATE POLICY "Allow public read sessions" ON public.analytics_sessions FOR SELECT USING (true);
 CREATE POLICY "Allow public read rewards" ON public.cyberwrap_rewards FOR SELECT USING (true);
 CREATE POLICY "Allow public read coupons" ON public.cyberwrap_coupons FOR SELECT USING (true);
 CREATE POLICY "Allow public read claims" ON public.cyberwrap_reward_claims FOR SELECT USING (true);
@@ -147,16 +202,55 @@ const CAMPAIGNS = [
 ];
 
 interface AnalyticsRow {
-  id: number;
+  id: number | string;
   session_id: string;
   campaign: string;
   event: string;
   timestamp: number;
-  game_version: string;
+  game_version?: string | null;
+  game_mode?: string | null;
   data: Record<string, any>;
   created_at: string;
   player_id?: string | null;
+  visitor_id?: string | null;
+  event_category?: string | null;
+  source?: string | null;
+  medium?: string | null;
+  referrer?: string | null;
+  page?: string | null;
+  path?: string | null;
 }
+
+interface VisitorRecord {
+  visitor_id: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  first_source?: string | null;
+  first_medium?: string | null;
+  first_campaign?: string | null;
+  first_referrer?: string | null;
+  first_landing_page?: string | null;
+  created_at: string;
+}
+
+interface SessionRecord {
+  session_id: string;
+  visitor_id: string;
+  started_at: string;
+  ended_at?: string | null;
+  landing_page?: string | null;
+  source?: string | null;
+  medium?: string | null;
+  campaign?: string | null;
+  referrer?: string | null;
+  device_type?: string | null;
+  browser?: string | null;
+  os?: string | null;
+  created_at: string;
+}
+
+const inMemoryVisitors = new Map<string, VisitorRecord>();
+const inMemorySessions = new Map<string, SessionRecord>();
 
 interface CyberwrapRewardRow {
   id: string;
@@ -207,10 +301,150 @@ let inMemoryClaims: CyberwrapRewardClaimRow[] = [];
 function computeAnalyticsSummary(rawEvents: AnalyticsRow[]) {
   const totalEvents = rawEvents.length;
   const uniqueSessions = new Set(rawEvents.map(e => e.session_id)).size;
-  const couponsEarned = rawEvents.filter(e => e.event === 'coupon_earned').length;
-  const couponsRedeemed = rawEvents.filter(e => e.event === 'coupon_redeemed').length;
-  const redemptionRate = couponsEarned > 0 ? (couponsRedeemed / couponsEarned) * 100 : 0;
+  
+  // Unique visitors: count distinct visitor_id, fallback to uniqueSessions if none
+  const visitorIds = new Set(rawEvents.filter(e => e.visitor_id).map(e => e.visitor_id as string));
+  const uniqueVisitors = visitorIds.size > 0 ? visitorIds.size : uniqueSessions;
 
+  // Website KPIs
+  const pageViews = rawEvents.filter(e => e.event === 'page_viewed' || e.event === 'landing_page_viewed').length;
+  const menuViews = rawEvents.filter(e => e.event === 'menu_viewed').length;
+  const orderIntentCount = rawEvents.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated').length;
+  const whatsappOrderOpened = rawEvents.filter(e => e.event === 'whatsapp_order_opened').length;
+  const conversionToWhatsAppIntent = uniqueSessions > 0 
+    ? Number(((orderIntentCount / uniqueSessions) * 100).toFixed(1)) 
+    : 0;
+
+  const websiteKPIs = {
+    uniqueVisitors,
+    totalSessions: uniqueSessions,
+    pageViews,
+    menuViews,
+    orderIntentCount,
+    whatsappOrderOpened,
+    conversionToWhatsAppIntent
+  };
+
+  // Daily Run KPIs
+  const dailyRunEventsList = ['game_started', 'game_played', 'challenge_completed', 'game_completed', 'daily_run_cta_clicked', 'post_order_daily_run_cta_clicked', 'daily_run_section_viewed', 'cyberwrap_launch_clicked'];
+  const dailyRunIdentities = new Set(
+    rawEvents
+      .filter(e => dailyRunEventsList.includes(e.event))
+      .map(e => e.player_id || e.visitor_id || e.session_id)
+  );
+  const dailyRunVisitors = dailyRunIdentities.size;
+  const dailyRunStarts = rawEvents.filter(e => ['game_started', 'game_played', 'cyberwrap_launch_clicked'].includes(e.event)).length;
+  const dailyRunCompletions = rawEvents.filter(e => ['challenge_completed', 'game_completed'].includes(e.event)).length;
+  const rewardsEarned = rawEvents.filter(e => ['coupon_earned', 'reward_earned'].includes(e.event)).length;
+  const couponsRedeemed = rawEvents.filter(e => e.event === 'coupon_redeemed').length;
+
+  const dailyRunKPIs = {
+    dailyRunVisitors,
+    dailyRunStarts,
+    dailyRunCompletions,
+    rewardsEarned,
+    couponsRedeemed
+  };
+
+  // Cross-Journey KPIs
+  // Identify sessions/visitors with daily run interaction
+  const dailyRunUsers = new Set<string>();
+  rawEvents.forEach(e => {
+    if (dailyRunEventsList.includes(e.event)) {
+      if (e.visitor_id) dailyRunUsers.add(e.visitor_id);
+      if (e.session_id) dailyRunUsers.add(e.session_id);
+      if (e.player_id) dailyRunUsers.add(e.player_id);
+    }
+  });
+
+  let dailyRunToWhatsAppIntent = 0;
+  let nonDailyRunToWhatsAppIntent = 0;
+  let couponAssistedOrderIntent = 0;
+
+  rawEvents.forEach(e => {
+    if (e.event === 'order_cta_clicked' || e.event === 'order_initiated' || e.event === 'whatsapp_order_opened') {
+      const isDailyRun = (e.visitor_id && dailyRunUsers.has(e.visitor_id)) ||
+                         (e.session_id && dailyRunUsers.has(e.session_id)) ||
+                         (e.player_id && dailyRunUsers.has(e.player_id));
+      if (isDailyRun) {
+        dailyRunToWhatsAppIntent++;
+      } else {
+        nonDailyRunToWhatsAppIntent++;
+      }
+
+      if (e.data && (e.data.coupon_applied || e.data.coupon_id || e.data.discount_xaf > 0)) {
+        couponAssistedOrderIntent++;
+      }
+    }
+  });
+
+  const postOrderDailyRunStarts = rawEvents.filter(e => e.event === 'post_order_daily_run_cta_clicked').length;
+
+  const crossJourneyKPIs = {
+    dailyRunToWhatsAppIntent,
+    nonDailyRunToWhatsAppIntent,
+    postOrderDailyRunStarts,
+    couponAssistedOrderIntent
+  };
+
+  // Source Performance (13 required properties)
+  const defaultSources = ['website', 'instagram', 'qr_table', 'qr_counter', 'qr_receipt', 'qr_delivery', 'social', 'direct', 'other'];
+  const allSources = Array.from(new Set([
+    ...defaultSources,
+    ...rawEvents.map(e => e.source || (e.data && e.data.source) || 'website')
+  ]));
+
+  const sourcePerformance = allSources.map(srcKey => {
+    const srcEvents = rawEvents.filter(e => {
+      const s = e.source || (e.data && e.data.source) || 'website';
+      return s === srcKey;
+    });
+
+    const srcVisitors = new Set(srcEvents.filter(e => e.visitor_id).map(e => e.visitor_id as string)).size ||
+                         new Set(srcEvents.map(e => e.session_id)).size;
+    const srcSessions = new Set(srcEvents.map(e => e.session_id)).size;
+    const srcPlayers = new Set(srcEvents.filter(e => e.player_id).map(e => e.player_id as string)).size;
+
+    const gameStarts = srcEvents.filter(e => ['game_started', 'game_played', 'cyberwrap_launch_clicked'].includes(e.event)).length;
+    const challengesCompleted = srcEvents.filter(e => ['challenge_completed', 'game_completed'].includes(e.event)).length;
+    const couponsEarned = srcEvents.filter(e => ['coupon_earned', 'reward_earned'].includes(e.event)).length;
+    const srcCouponsRedeemed = srcEvents.filter(e => e.event === 'coupon_redeemed').length;
+    const srcMenuViews = srcEvents.filter(e => e.event === 'menu_viewed').length;
+    const srcOrderIntentCount = srcEvents.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated').length;
+    const srcWhatsAppOpened = srcEvents.filter(e => e.event === 'whatsapp_order_opened').length;
+    const conversion = srcSessions > 0 ? Number(((srcOrderIntentCount / srcSessions) * 100).toFixed(1)) : 0;
+
+    const displayNames: Record<string, string> = {
+      website: 'Website (Direct/Organic)',
+      instagram: 'Instagram Bio/Stories',
+      qr_table: 'Table QR Stand',
+      qr_counter: 'Checkout Counter QR',
+      qr_receipt: 'Receipt QR Code',
+      qr_delivery: 'Takeout Bag Sticker',
+      social: 'Social Media',
+      direct: 'Direct Link',
+      other: 'Other Sources'
+    };
+
+    return {
+      source: srcKey,
+      displayName: displayNames[srcKey] || srcKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      visitors: srcVisitors,
+      sessions: srcSessions,
+      players: srcPlayers,
+      gameStarts,
+      challengesCompleted,
+      couponsEarned,
+      couponsRedeemed: srcCouponsRedeemed,
+      menuViews: srcMenuViews,
+      orderIntentCount: srcOrderIntentCount,
+      whatsappOrderOpened: srcWhatsAppOpened,
+      conversionToWhatsAppIntent: conversion,
+      ordersInitiated: srcOrderIntentCount // legacy alias
+    };
+  }).filter(sp => sp.sessions > 0 || defaultSources.includes(sp.source));
+
+  // Legacy event frequency
   const eventCounts: Record<string, number> = {};
   rawEvents.forEach(e => {
     eventCounts[e.event] = (eventCounts[e.event] || 0) + 1;
@@ -223,6 +457,7 @@ function computeAnalyticsSummary(rawEvents: AnalyticsRow[]) {
     percentage: totalEvents > 0 ? Math.round((count / totalEvents) * 100) : 0
   })).sort((a, b) => b.count - a.count);
 
+  // Volume over time
   const volumeMap: Record<string, { total: number; games: number; couponsEarned: number; couponsRedeemed: number }> = {};
   const chronoEvents = [...rawEvents].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
@@ -233,8 +468,8 @@ function computeAnalyticsSummary(rawEvents: AnalyticsRow[]) {
       volumeMap[key] = { total: 0, games: 0, couponsEarned: 0, couponsRedeemed: 0 };
     }
     volumeMap[key].total++;
-    if (e.event === 'game_played') volumeMap[key].games++;
-    if (e.event === 'coupon_earned') volumeMap[key].couponsEarned++;
+    if (['game_played', 'game_started', 'cyberwrap_launch_clicked'].includes(e.event)) volumeMap[key].games++;
+    if (['coupon_earned', 'reward_earned'].includes(e.event)) volumeMap[key].couponsEarned++;
     if (e.event === 'coupon_redeemed') volumeMap[key].couponsRedeemed++;
   });
 
@@ -261,14 +496,20 @@ function computeAnalyticsSummary(rawEvents: AnalyticsRow[]) {
     color: campaignColors[index % campaignColors.length]
   })).sort((a, b) => b.count - a.count);
 
+  const redemptionRate = rewardsEarned > 0 ? (couponsRedeemed / rewardsEarned) * 100 : 0;
+
   return {
     kpis: {
       totalEvents,
       totalUniqueSessions: uniqueSessions,
-      totalCouponsEarned: couponsEarned,
+      totalCouponsEarned: rewardsEarned,
       totalCouponsRedeemed: couponsRedeemed,
       redemptionRate: Number(redemptionRate.toFixed(1))
     },
+    websiteKPIs,
+    dailyRunKPIs,
+    crossJourneyKPIs,
+    sourcePerformance,
     eventFrequency,
     volumeOverTime,
     campaignDistribution
@@ -350,6 +591,8 @@ app.get('/api/analytics/summary', async (req, res) => {
     dataSource,
     isSupabaseConfigured,
     isSupabaseConnected,
+    isRevenueAttributionPending: true,
+    statusNote: 'WhatsApp Order Intent tracked; revenue attribution pending confirmed customer pickup/delivery.',
     error: errorMessage,
     lastUpdated: new Date().toISOString(),
     ...aggregated,
@@ -391,54 +634,199 @@ app.get('/api/analytics/events', async (req, res) => {
   });
 });
 
-// POST /api/analytics/events - Insert event
+// POST /api/analytics/events - Insert event with anonymous identity model & safety
 app.post('/api/analytics/events', async (req, res) => {
-  const { session_id, campaign, event, timestamp, game_version, data, player_id } = req.body;
+  const {
+    visitor_id,
+    session_id,
+    campaign,
+    event,
+    event_category,
+    source,
+    medium,
+    referrer,
+    page,
+    path,
+    timestamp,
+    game_version,
+    game_mode,
+    data,
+    player_id
+  } = req.body;
 
   if (!event) {
     return res.status(400).json({ error: 'Field "event" is required.' });
   }
 
+  // Derive event_category if not explicitly supplied
+  let cleanCategory = event_category;
+  if (!cleanCategory) {
+    if (['session_started', 'landing_page_viewed'].includes(event)) cleanCategory = 'acquisition';
+    else if (['page_viewed', 'section_viewed', 'menu_viewed', 'product_viewed', 'cta_clicked', 'cart_viewed', 'add_to_cart', 'remove_from_cart'].includes(event)) cleanCategory = 'website';
+    else if (['order_cta_clicked', 'whatsapp_order_opened', 'coupon_entered', 'coupon_validated', 'coupon_applied'].includes(event)) cleanCategory = 'commerce';
+    else if (['daily_run_section_viewed', 'daily_run_cta_clicked', 'post_order_daily_run_cta_clicked', 'game_started', 'game_played', 'game_completed', 'challenge_completed', 'cyberwrap_launch_clicked'].includes(event)) cleanCategory = 'daily_run';
+    else if (['reward_earned', 'reward_viewed', 'reward_copied', 'coupon_earned', 'coupon_redeemed'].includes(event)) cleanCategory = 'reward';
+    else if (['scroll_depth', 'section_visibility', 'element_clicked', 'dead_click', 'rage_click'].includes(event)) cleanCategory = 'ux';
+    else cleanCategory = 'website';
+  }
+
+  // Normalize identities
+  const cleanSessionId = session_id || `sess_${Date.now()}_${Math.floor(Math.random() * 8999 + 1000)}`;
+  const cleanVisitorId = visitor_id || `vis_${cleanSessionId.replace(/^sess_/, '')}`;
+
+  // Sanitize PII from data
+  const sanitizedData: Record<string, any> = {};
+  if (data && typeof data === 'object') {
+    const piiKeys = ['name', 'phone', 'address', 'message', 'notes', 'email'];
+    for (const [k, v] of Object.entries(data)) {
+      if (!piiKeys.some(pii => k.toLowerCase().includes(pii))) {
+        sanitizedData[k] = v;
+      }
+    }
+  }
+
+  const nowIso = new Date().toISOString();
   const newEvent: AnalyticsRow = {
     id: Date.now(),
-    session_id: session_id || `sess_${Math.floor(Math.random() * 9000) + 1000}`,
-    campaign: campaign || 'Summer Shawarma Splash',
+    visitor_id: cleanVisitorId,
+    session_id: cleanSessionId,
+    player_id: player_id || null,
+    campaign: campaign || 'dailybread-cyberwrap',
     event,
+    event_category: cleanCategory,
+    source: source || 'website',
+    medium: medium || 'direct',
+    referrer: referrer || null,
+    page: page || '/',
+    path: path || '/',
     timestamp: timestamp || Date.now(),
-    game_version: game_version || 'v1.4.2',
-    data: data || {},
-    created_at: new Date().toISOString(),
-    player_id: player_id || null
+    game_version: game_version || 'web-v1.4.2',
+    game_mode: game_mode || null,
+    data: sanitizedData,
+    created_at: nowIso
   };
+
+  // Upsert in-memory visitor
+  const existingVis = inMemoryVisitors.get(cleanVisitorId);
+  if (!existingVis) {
+    inMemoryVisitors.set(cleanVisitorId, {
+      visitor_id: cleanVisitorId,
+      first_seen_at: nowIso,
+      last_seen_at: nowIso,
+      first_source: newEvent.source,
+      first_medium: newEvent.medium,
+      first_campaign: newEvent.campaign,
+      first_referrer: newEvent.referrer,
+      first_landing_page: newEvent.page,
+      created_at: nowIso
+    });
+  } else {
+    existingVis.last_seen_at = nowIso;
+  }
+
+  // Upsert in-memory session
+  const existingSess = inMemorySessions.get(cleanSessionId);
+  if (!existingSess) {
+    inMemorySessions.set(cleanSessionId, {
+      session_id: cleanSessionId,
+      visitor_id: cleanVisitorId,
+      started_at: nowIso,
+      landing_page: newEvent.page,
+      source: newEvent.source,
+      medium: newEvent.medium,
+      campaign: newEvent.campaign,
+      referrer: newEvent.referrer,
+      created_at: nowIso
+    });
+  }
 
   const client = getSupabaseClient();
   if (client) {
     try {
+      // First attempt inserting full new schema row into analytics_events
+      const fullInsertPayload = {
+        session_id: newEvent.session_id,
+        campaign: newEvent.campaign,
+        event: newEvent.event,
+        timestamp: newEvent.timestamp,
+        game_version: newEvent.game_version,
+        data: newEvent.data,
+        player_id: newEvent.player_id,
+        visitor_id: newEvent.visitor_id,
+        event_category: newEvent.event_category,
+        source: newEvent.source,
+        medium: newEvent.medium,
+        referrer: newEvent.referrer,
+        page: newEvent.page,
+        path: newEvent.path
+      };
+
       const { data: inserted, error } = await client
         .from('analytics_events')
-        .insert([{
-          session_id: newEvent.session_id,
-          campaign: newEvent.campaign,
-          event: newEvent.event,
-          timestamp: newEvent.timestamp,
-          game_version: newEvent.game_version,
-          data: newEvent.data,
-          player_id: newEvent.player_id
-        }])
+        .insert([fullInsertPayload])
         .select();
 
       if (!error && inserted && inserted.length > 0) {
+        // Asynchronously attempt to record visitor and session in Supabase (fire and forget)
+        (async () => {
+          try {
+            await client.from('analytics_visitors').upsert({
+              visitor_id: cleanVisitorId,
+              last_seen_at: nowIso,
+              first_source: newEvent.source,
+              first_campaign: newEvent.campaign
+            });
+          } catch {
+            // Ignored if table not yet migrated
+          }
+          try {
+            await client.from('analytics_sessions').upsert({
+              session_id: cleanSessionId,
+              visitor_id: cleanVisitorId,
+              started_at: nowIso,
+              source: newEvent.source,
+              campaign: newEvent.campaign
+            });
+          } catch {
+            // Ignored if table not yet migrated
+          }
+        })();
+
         return res.status(201).json({
           success: true,
           savedTo: 'supabase',
           event: inserted[0]
         });
       }
+
+      // If error was due to missing columns in table, fallback to inserting baseline columns
+      if (error) {
+        const { data: fallbackInserted, error: fallbackError } = await client
+          .from('analytics_events')
+          .insert([{
+            session_id: newEvent.session_id,
+            campaign: newEvent.campaign,
+            event: newEvent.event,
+            timestamp: newEvent.timestamp,
+            game_version: newEvent.game_version || 'v1.4.2',
+            data: newEvent.data,
+            player_id: newEvent.player_id
+          }])
+          .select();
+
+        if (!fallbackError && fallbackInserted && fallbackInserted.length > 0) {
+          return res.status(201).json({
+            success: true,
+            savedTo: 'supabase_baseline',
+            event: fallbackInserted[0]
+          });
+        }
+      }
     } catch {}
   }
 
   inMemoryEvents.unshift(newEvent);
-  if (inMemoryEvents.length > 500) inMemoryEvents.pop();
+  if (inMemoryEvents.length > 1000) inMemoryEvents.pop();
 
   res.status(201).json({
     success: true,
@@ -683,7 +1071,7 @@ app.patch('/api/admin/rewards/coupons/:id/status', async (req, res) => {
   });
 });
 
-// POST /api/rewards/claim-score - User flow: Submit game score, update rewards, trigger coupons (2,000 pts threshold)
+// POST /api/rewards/claim-score - User flow: Submit game score, update rewards, trigger coupons (200 pts threshold)
 app.post('/api/rewards/claim-score', async (req, res) => {
   const { player_id, session_id, game_id, score_amount, game_version } = req.body;
 
@@ -790,30 +1178,34 @@ app.post('/api/rewards/claim-score', async (req, res) => {
   // -------------------------------------------------------------
   // Approved CyberWrap Reward Logic:
   // current cumulative score + completed session score = new cumulative score
-  // When cumulative_score >= 2000 AND coupons_earned_in_cycle < 2:
+  // When cumulative_score >= 200 AND coupons_earned_in_cycle < 2:
   // 1. Generate one unique 20% coupon.
   // 2. Coupon expires exactly 7 days after generated_at.
   // 3. Increment coupons_earned_in_cycle.
-  // 4. Subtract 2,000 from cumulative_score.
+  // 4. Subtract 200 from cumulative_score.
   // 5. Carry any remaining points forward.
   // -------------------------------------------------------------
+  const REWARD_THRESHOLD_PTS = 200;
+  const MAX_COUPONS_PER_CYCLE = 2;
   const currentCumulative = Number(playerReward.cumulative_score) || 0;
-  const newCumulative = currentCumulative + numScore;
-  let newCoupon: CyberwrapCouponRow | null = null;
+  let remainingCumulative = currentCumulative + numScore;
+  let couponsEarnedInCycle = Number(playerReward.coupons_earned_in_cycle) || 0;
+  const newlyGeneratedCoupons: CyberwrapCouponRow[] = [];
   let milestoneReached = false;
 
-  if (newCumulative >= 2000 && (Number(playerReward.coupons_earned_in_cycle) || 0) < 2) {
+  // Issue up to MAX_COUPONS_PER_CYCLE (2) coupons when score reaches threshold multiples
+  while (remainingCumulative >= REWARD_THRESHOLD_PTS && couponsEarnedInCycle < MAX_COUPONS_PER_CYCLE) {
     milestoneReached = true;
-    playerReward.coupons_earned_in_cycle = (Number(playerReward.coupons_earned_in_cycle) || 0) + 1;
-    playerReward.cumulative_score = newCumulative - 2000; // Subtract 2,000 and carry remaining forward
-    playerReward.reward_status = 'active';
+    couponsEarnedInCycle += 1;
+    remainingCumulative -= REWARD_THRESHOLD_PTS; // Deduct exactly 200 pts per issued coupon
 
+    const currentCouponUuid = crypto.randomUUID();
     const couponSuffix = Math.floor(Math.random() * 8999 + 1000);
     const code = `SHAWARMA-20-${couponSuffix}`;
     const couponExpiresAt = new Date(nowMs + CYCLE_DURATION_MS).toISOString(); // Exactly 7 days
 
-    newCoupon = {
-      id: couponUuid,
+    const createdCoupon: CyberwrapCouponRow = {
+      id: currentCouponUuid,
       player_id: playerUuid,
       reward_id: playerReward.id,
       code_hash: code,
@@ -824,24 +1216,36 @@ app.post('/api/rewards/claim-score', async (req, res) => {
       redeemed_at: null,
       created_at: now
     };
-    inMemoryCoupons.unshift(newCoupon);
+
+    newlyGeneratedCoupons.push(createdCoupon);
+    inMemoryCoupons.unshift(createdCoupon);
 
     inMemoryEvents.unshift({
-      id: Date.now(),
+      id: Date.now() + newlyGeneratedCoupons.length,
       session_id: sessId,
       campaign: 'Summer Shawarma Splash',
       event: 'coupon_earned',
       timestamp: Date.now(),
       game_version: game_version || 'v1.4.2',
-      data: { coupon_code: code, discount: '20%', score: numScore, cumulative_remainder: playerReward.cumulative_score },
+      data: { 
+        coupon_code: code, 
+        discount: '20%', 
+        score: numScore, 
+        cumulative_remainder: remainingCumulative,
+        coupons_in_cycle: couponsEarnedInCycle
+      },
       created_at: now,
       player_id: playerUuid
     });
-  } else {
-    playerReward.cumulative_score = newCumulative;
   }
 
+  // Update authoritative reward state
+  playerReward.cumulative_score = remainingCumulative;
+  playerReward.coupons_earned_in_cycle = couponsEarnedInCycle;
+  playerReward.reward_status = couponsEarnedInCycle >= MAX_COUPONS_PER_CYCLE ? 'cycle_completed' : 'active';
   playerReward.updated_at = now;
+
+  const primaryCoupon = newlyGeneratedCoupons[0] || null;
 
   // Create Claim Record
   const newClaim: CyberwrapRewardClaimRow = {
@@ -851,7 +1255,7 @@ app.post('/api/rewards/claim-score', async (req, res) => {
     game_id: gameUuid,
     score_amount: numScore,
     credited_amount: numScore,
-    coupon_id: newCoupon ? newCoupon.id : null,
+    coupon_id: primaryCoupon ? primaryCoupon.id : null,
     created_at: now
   };
   inMemoryClaims.unshift(newClaim);
@@ -875,24 +1279,26 @@ app.post('/api/rewards/claim-score', async (req, res) => {
 
       const realRewardId = (upsertedReward && upsertedReward[0]?.id) || playerReward.id;
 
-      // 2. Insert coupon if generated
+      // 2. Insert any newly generated coupons
       let realCouponId: string | null = null;
-      if (newCoupon) {
-        const { data: insertedCoupon } = await client
+      if (newlyGeneratedCoupons.length > 0) {
+        const couponsToInsert = newlyGeneratedCoupons.map(c => ({
+          id: c.id,
+          player_id: playerUuid,
+          reward_id: realRewardId,
+          code_hash: c.code_hash,
+          discount_percent: 20,
+          status: 'active',
+          generated_at: c.generated_at,
+          expires_at: c.expires_at
+        }));
+
+        const { data: insertedCoupons } = await client
           .from('cyberwrap_coupons')
-          .insert([{
-            id: couponUuid,
-            player_id: playerUuid,
-            reward_id: realRewardId,
-            code_hash: newCoupon.code_hash,
-            discount_percent: 20,
-            status: 'active',
-            generated_at: newCoupon.generated_at,
-            expires_at: newCoupon.expires_at
-          }])
+          .insert(couponsToInsert)
           .select();
 
-        realCouponId = (insertedCoupon && insertedCoupon[0]?.id) || couponUuid;
+        realCouponId = (insertedCoupons && insertedCoupons[0]?.id) || primaryCoupon?.id || null;
       }
 
       // 3. Insert claim
@@ -929,7 +1335,7 @@ app.post('/api/rewards/claim-score', async (req, res) => {
         }
       ];
 
-      if (newCoupon && realCouponId) {
+      newlyGeneratedCoupons.forEach((couponItem) => {
         eventsToInsert.push({
           session_id: sessId,
           campaign: 'Summer Shawarma Splash',
@@ -937,8 +1343,8 @@ app.post('/api/rewards/claim-score', async (req, res) => {
           timestamp: Date.now(),
           game_version: game_version || 'v1.4.2',
           data: { 
-            coupon_id: realCouponId,
-            coupon_code: newCoupon.code_hash, 
+            coupon_id: couponItem.id,
+            coupon_code: couponItem.code_hash, 
             discount: '20%', 
             score: numScore, 
             game_id: gameUuid,
@@ -946,7 +1352,7 @@ app.post('/api/rewards/claim-score', async (req, res) => {
           },
           player_id: playerUuid
         });
-      }
+      });
 
       await client
         .from('analytics_events')
@@ -960,11 +1366,12 @@ app.post('/api/rewards/claim-score', async (req, res) => {
     success: true,
     claim: newClaim,
     reward: playerReward,
-    newCoupon,
+    newCoupon: primaryCoupon,
+    newCoupons: newlyGeneratedCoupons,
     milestoneReached,
     message: milestoneReached
-      ? `🎉 Score +${numScore} credited! 2,000-point threshold reached: Unique 20% coupon unlocked! Remaining balance: ${playerReward.cumulative_score} / 2,000 pts.`
-      : `Score +${numScore} credited to reward cycle (${playerReward.cumulative_score} / 2,000 pts towards 20% coupon).`
+      ? `🎉 Score +${numScore} credited! ${newlyGeneratedCoupons.length} coupon(s) unlocked! Remaining balance: ${playerReward.cumulative_score} / 200 pts.`
+      : `Score +${numScore} credited to reward cycle (${playerReward.cumulative_score} / 200 pts towards 20% coupon).`
   });
 });
 
@@ -1033,7 +1440,7 @@ app.get('/api/rewards/player/:player_id', async (req, res) => {
   });
 });
 
-// POST /api/admin/rewards/seed - Seed demo data strictly adhering to 2,000 pts threshold and 7-day cycles
+// POST /api/admin/rewards/seed - Seed demo data strictly adhering to 200 pts threshold and 7-day cycles
 app.post('/api/admin/rewards/seed', async (req, res) => {
   const count = Math.min(parseInt(req.body.count, 10) || 5, 20);
   const now = new Date();
@@ -1041,11 +1448,11 @@ app.post('/api/admin/rewards/seed', async (req, res) => {
   const CYCLE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
   const demoPlayers = [
-    { id: '11111111-1111-4111-a111-111111111111', name: 'Alain Mbarga (Top Scorer)', baseScore: 2650, games: [750, 600, 800, 500] },
-    { id: '22222222-2222-4222-a222-222222222222', name: 'Sandra Eto’o', baseScore: 1850, games: [950, 900] },
-    { id: '33333333-3333-4333-a333-333333333333', name: 'Junior Nsangou', baseScore: 1400, games: [700, 700] },
-    { id: '44444444-4444-4444-a444-444444444444', name: 'Chantal Biya', baseScore: 2300, games: [1200, 1100] },
-    { id: '55555555-5555-4555-a555-555555555555', name: 'Cedric Ngannou', baseScore: 650, games: [650] }
+    { id: '11111111-1111-4111-a111-111111111111', name: 'Alain Mbarga (Top Scorer)', baseScore: 265, games: [75, 60, 80, 50] },
+    { id: '22222222-2222-4222-a222-222222222222', name: 'Sandra Eto’o', baseScore: 185, games: [95, 90] },
+    { id: '33333333-3333-4333-a333-333333333333', name: 'Junior Nsangou', baseScore: 140, games: [70, 70] },
+    { id: '44444444-4444-4444-a444-444444444444', name: 'Chantal Biya', baseScore: 230, games: [120, 110] },
+    { id: '55555555-5555-4555-a555-555555555555', name: 'Cedric Ngannou', baseScore: 65, games: [65] }
   ].slice(0, count);
 
   inMemoryPlayers = [];
@@ -1078,9 +1485,9 @@ app.post('/api/admin/rewards/seed', async (req, res) => {
       let couponId: string | null = null;
 
       const newCumulative = cumulative + score;
-      if (newCumulative >= 2000 && couponsEarned < 2) {
+      if (newCumulative >= 200 && couponsEarned < 2) {
         couponsEarned += 1;
-        cumulative = newCumulative - 2000;
+        cumulative = newCumulative - 200;
         couponId = crypto.randomUUID();
 
         const couponRow: CyberwrapCouponRow = {
@@ -1307,6 +1714,19 @@ app.post('/api/rewards/redeem-coupon', async (req, res) => {
     discountPercent: coupon.discount_percent,
     message: `Voucher ${coupon.code_hash} successfully redeemed (-${coupon.discount_percent}% applied).`
   });
+});
+
+// Fallback static route for 3D model smoothie.glb requests
+app.get(['/smoothie.glb', '/public/smoothie.glb'], (req, res) => {
+  const primaryPath = path.join(process.cwd(), 'public', 'smoothie.glb');
+  const fallbackPath = path.join(process.cwd(), 'public', '3d_shawarma_sample-specimen-v1.glb');
+  if (fs.existsSync(primaryPath)) {
+    res.sendFile(primaryPath);
+  } else if (fs.existsSync(fallbackPath)) {
+    res.sendFile(fallbackPath);
+  } else {
+    res.status(404).send('3D Model not found');
+  }
 });
 
 // -------------------------------------------------------------

@@ -30,7 +30,8 @@ import {
   Loader2,
   AlertCircle,
   Gamepad2,
-  ExternalLink
+  ExternalLink,
+  Lock
 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { ThreeDPhotoEffect } from './components/ThreeDPhotoEffect';
@@ -38,7 +39,10 @@ import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { AdminRewardsDashboard } from './components/AdminRewardsDashboard';
 import { AdminGuard } from './components/AdminGuard';
 import { CyberWrapBanner } from './components/CyberWrapBanner';
-import { rewardsApi } from './services/rewardsApi';
+import { CyberWrapPlaySection } from './components/CyberWrapPlaySection';
+import { PostOrderEngagementModal } from './components/PostOrderEngagementModal';
+import { rewardsApi, CyberwrapCoupon } from './services/rewardsApi';
+import { getAttribution, buildCyberWrapLaunchUrl, recordCyberWrapLaunchClick } from './lib/attribution';
 import './types';
 
 // Bind MeshoptDecoder globally immediately so that <model-viewer> internal THREE.GLTFLoader auto-detects it.
@@ -143,15 +147,18 @@ export default function App() {
   // Active view: 'storefront' | 'analytics' | 'rewards_admin'
   const [activeView, setActiveView] = useState<'storefront' | 'analytics' | 'rewards_admin'>('storefront');
   const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discountPercent: number; couponId?: string } | null>(null);
+  const [unappliedCyberwrapCoupon, setUnappliedCyberwrapCoupon] = useState<CyberwrapCoupon | null>(null);
   const [couponInput, setCouponInput] = useState<string>('');
   const [isValidatingCoupon, setIsValidatingCoupon] = useState<boolean>(false);
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponSuccessMessage, setCouponSuccessMessage] = useState<string | null>(null);
   const [sessionId] = useState<string>(() => 'sess_' + Math.floor(Math.random() * 9000 + 1000));
 
-  // Log client events to Supabase backend
-  const logAnalyticsEvent = async (event: string, campaign: string = 'Summer Shawarma Splash', data: Record<string, any> = {}) => {
+  // Log client events to backend with full QR campaign attribution
+  const logAnalyticsEvent = async (event: string, campaignOverride?: string, data: Record<string, any> = {}) => {
     try {
+      const attr = getAttribution();
+      const campaign = campaignOverride || attr.campaign || 'Summer Shawarma Splash';
       await fetch('/api/analytics/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -161,7 +168,12 @@ export default function App() {
           event,
           game_version: 'v1.4.2',
           timestamp: Date.now(),
-          data
+          data: {
+            ...data,
+            source: data.source || attr.source || 'website',
+            placement: data.placement || attr.placement || 'direct',
+            player_id: data.player_id || rewardsApi.getLocalPlayerId()
+          }
         })
       });
     } catch {
@@ -169,9 +181,33 @@ export default function App() {
     }
   };
 
-  // Track page visit on mount
+  // Track page visit & load authoritative active coupon from player profile
   useEffect(() => {
-    logAnalyticsEvent('menu_viewed', 'Summer Shawarma Splash', { platform: 'web', path: '/' });
+    const attr = getAttribution();
+    logAnalyticsEvent('page_viewed', attr.campaign, {
+      source: attr.source,
+      placement: attr.placement || 'direct',
+      path: window.location.pathname
+    });
+
+    async function checkUserCoupons() {
+      try {
+        const pid = rewardsApi.getLocalPlayerId();
+        if (!pid) return;
+        const res = await rewardsApi.getPlayerRewards(pid);
+        if (res.success && (res.activeCoupons || res.coupons)) {
+          const active = (res.activeCoupons && res.activeCoupons.length > 0)
+            ? res.activeCoupons[0]
+            : res.coupons.find((c) => c.status === 'active' && new Date(c.expires_at).getTime() > Date.now());
+          if (active) {
+            setUnappliedCyberwrapCoupon(active);
+          }
+        }
+      } catch {
+        // Safe non-blocking fallback
+      }
+    }
+    checkUserCoupons();
   }, []);
 
   // Guarantee MeshoptDecoder is loaded globally and compiled before custom GLB models load
@@ -340,6 +376,7 @@ export default function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [showCheckoutSuccess, setShowCheckoutSuccess] = useState<boolean>(false);
+  const [showPostOrderModal, setShowPostOrderModal] = useState<boolean>(false);
 
   // Live eatery local time validation state
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -372,6 +409,17 @@ export default function App() {
   
   // Real-time Operating Hours Calculations: Open Tue-Sun 1:00 PM to 10:30 PM
   useEffect(() => {
+    // Check if admin portal is requested via URL query string (e.g. ?admin=analytics or ?admin=rewards)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const adminParam = params.get('admin');
+      if (adminParam === 'analytics' || adminParam === 'true') {
+        setActiveView('analytics');
+      } else if (adminParam === 'rewards' || adminParam === 'rewards_admin') {
+        setActiveView('rewards_admin');
+      }
+    }
+
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 15000);
@@ -588,6 +636,7 @@ export default function App() {
     }
 
     setShowCheckoutSuccess(true);
+    setShowPostOrderModal(true);
     setCart([]);
   };
 
@@ -623,10 +672,12 @@ export default function App() {
 
   if (activeView === 'analytics') {
     return (
-      <AnalyticsDashboard 
-        onBackToStore={() => setActiveView('storefront')} 
-        onNavigateToRewardsAdmin={() => setActiveView('rewards_admin')}
-      />
+      <AdminGuard onBackToHome={() => setActiveView('storefront')}>
+        <AnalyticsDashboard 
+          onBackToStore={() => setActiveView('storefront')} 
+          onNavigateToRewardsAdmin={() => setActiveView('rewards_admin')}
+        />
+      </AdminGuard>
     );
   }
 
@@ -668,6 +719,13 @@ export default function App() {
           </div>
 
           <div className="hidden lg:flex items-center gap-6 text-sm font-semibold text-brand-text/80">
+            <a 
+              href="#play-cyberwrap" 
+              className="flex items-center gap-1.5 text-orange-600 font-extrabold hover:text-orange-700 bg-orange-50 px-3.5 py-1.5 rounded-full border border-orange-200/80 transition-all hover:shadow-sm"
+              onClick={() => logAnalyticsEvent('cyberwrap_launch_clicked', 'Summer Shawarma Splash', { source: 'header_nav' })}
+            >
+              <span>🎮 PLAY</span>
+            </a>
             <a href="#menu" className="hover:text-brand-primary transition-colors">Our Menu</a>
             <a href="#about" className="hover:text-brand-primary transition-colors">About Us</a>
             <a href="#catering" className="hover:text-brand-primary transition-colors">Catering & Events</a>
@@ -676,30 +734,6 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-3 font-ui">
-            {/* Supabase Cyberwrap Rewards Admin Dashboard Button */}
-            <button
-              onClick={() => setActiveView('rewards_admin')}
-              className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-500/30 px-3 py-2 rounded-full text-xs font-bold transition-all shadow-sm cursor-pointer group"
-              title="Open Supabase Cyberwrap Rewards Admin Dashboard (Coupons, Claims & Player Scores)"
-              id="rewards-admin-btn"
-            >
-              <Gift size={14} className="text-amber-600 group-hover:scale-110 transition-transform" />
-              <span className="hidden sm:inline">Rewards</span>
-              <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded font-mono font-bold">Admin</span>
-            </button>
-
-            {/* Live Analytics CMS Dashboard Switcher Button */}
-            <button
-              onClick={() => setActiveView('analytics')}
-              className="flex items-center gap-1.5 bg-[#161b22] hover:bg-[#21262d] text-orange-400 border border-orange-500/30 px-3 py-2 rounded-full text-xs font-bold transition-all shadow-sm cursor-pointer group"
-              title="Open Real-Time Analytics CMS Dashboard (Supabase + Recharts)"
-              id="analytics-dashboard-btn"
-            >
-              <Activity size={14} className="text-orange-400 group-hover:animate-spin" />
-              <span className="hidden sm:inline">Analytics</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            </button>
-
             {/* Click-to-call Customer Support on Header */}
             <a 
               href={`tel:${phoneNumber}`} 
@@ -767,21 +801,43 @@ export default function App() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start font-ui">
+              {/* Primary CTA: ORDER NOW */}
               <a 
                 href="#menu" 
-                className="bg-brand-primary text-white hover:bg-brand-accent-2 text-center font-bold px-8 py-4 rounded-xl shadow-lg shadow-brand-primary/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                className="bg-brand-primary hover:bg-brand-accent-2 text-white text-center font-black px-8 py-4 rounded-xl shadow-lg shadow-brand-primary/25 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2 text-base cursor-pointer"
+                onClick={() => logAnalyticsEvent('menu_cta_clicked', undefined, { placement: 'homepage_hero' })}
               >
-                <span>Customize & Order Now</span>
+                <span>ORDER NOW</span>
                 <ChevronRight size={18} />
               </a>
+
+              {/* Secondary CTA: PLAY YOUR DAILY RUN */}
+              <a 
+                href="#play-cyberwrap" 
+                className="bg-orange-50 hover:bg-orange-100 text-orange-800 border-2 border-orange-300/90 font-bold px-6 py-4 rounded-xl transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm shadow-sm cursor-pointer"
+                onClick={() => {
+                  recordCyberWrapLaunchClick('homepage_hero');
+                  logAnalyticsEvent('cyberwrap_launch_clicked', undefined, { placement: 'homepage_hero' });
+                }}
+              >
+                <span>🎮 PLAY YOUR DAILY RUN</span>
+              </a>
+
+              {/* Directions */}
               <a 
                 href="#location" 
-                className="bg-white hover:bg-stone-50 text-brand-text border border-brand-text/15 text-center font-bold px-6 py-4 rounded-xl shadow-sm transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                className="bg-white hover:bg-stone-50 text-brand-text border border-brand-text/15 text-center font-semibold px-5 py-4 rounded-xl shadow-sm transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm cursor-pointer"
               >
-                <MapPin size={18} className="text-brand-primary" />
+                <MapPin size={16} className="text-brand-primary" />
                 <span>Directions</span>
               </a>
             </div>
+
+            {/* Supporting Copy: Play. Earn. Eat. */}
+            <p className="text-xs font-semibold text-brand-text/75 flex items-center justify-center lg:justify-start gap-1.5 font-sans">
+              <Sparkles size={14} className="text-amber-500 shrink-0" />
+              <span><strong>Play. Earn. Eat.</strong> — Score 200 points in CyberWrap to unlock 20% OFF your next order.</span>
+            </p>
 
             <div className="pt-2 flex flex-wrap justify-center lg:justify-start items-center gap-6 text-brand-text/60 text-xs font-semibold font-ui">
               <div className="flex items-center gap-2">
@@ -820,6 +876,15 @@ export default function App() {
         </div>
       </section>
 
+      {/* 2.5 CyberWrap Play & Earn Section with Live Daily Run Tracker */}
+      <CyberWrapPlaySection 
+        onOrderClick={() => {
+          const menuElem = document.getElementById('menu');
+          if (menuElem) menuElem.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onLaunchClick={() => logAnalyticsEvent('cyberwrap_launch_clicked', 'Summer Shawarma Splash', { source: 'play_section' })}
+      />
+
       {/* Extra Local trust banner */}
       <div className="bg-brand-text text-stone-100 py-6 pr-4 pl-4 text-center font-ui">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-around gap-4 text-sm font-semibold">
@@ -852,6 +917,31 @@ export default function App() {
           <p className="text-brand-text/80 text-sm font-sans">
             Select your preferred base wrap from our options, check exclusions, add premium local side compliments with dynamic real-time price updates, then place your order on WhatsApp instantly.
           </p>
+
+          {/* Contextual CyberWrap Menu Cross-Sell */}
+          <div className="bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-orange-500/10 border border-orange-500/25 rounded-2xl p-3.5 sm:p-4 max-w-xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left shadow-sm">
+            <div className="space-y-0.5">
+              <p className="text-xs font-bold text-orange-950 flex items-center justify-center sm:justify-start gap-1.5 font-sans">
+                <Sparkles size={13} className="text-orange-600 shrink-0" />
+                <span>Want 20% OFF your next order? Take today&apos;s Daily Run.</span>
+              </p>
+              <p className="text-[11px] text-brand-text/70 font-sans">
+                Drive through Buea in CyberWrap, deliver shawarmas, and score 200 points to unlock your coupon.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                recordCyberWrapLaunchClick('menu');
+                logAnalyticsEvent('cyberwrap_launch_clicked', undefined, { placement: 'menu' });
+                window.open(buildCyberWrapLaunchUrl('menu'), '_blank', 'noopener,noreferrer');
+              }}
+              className="bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer uppercase tracking-wider font-ui"
+            >
+              <span>🎮 PLAY NOW</span>
+              <ExternalLink size={12} />
+            </button>
+          </div>
 
           {/* Quick Menu Category Selector Buttons */}
           <div className="flex flex-wrap justify-center gap-2 pt-4 font-ui">
@@ -1862,20 +1952,12 @@ export default function App() {
                <li><a href="#about" className="hover:text-amber-400 transition-colors">About DailyBread Studio</a></li>
                <li><a href="#location" className="hover:text-amber-400 transition-colors">Google Maps Directions</a></li>
                <li>
-                 <button 
-                   onClick={() => setActiveView('rewards_admin')} 
-                   className="text-amber-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                 <a 
+                   href="#play-cyberwrap" 
+                   className="text-orange-400 hover:underline flex items-center gap-1 font-semibold"
                  >
-                   <span>🎁 Cyberwrap Rewards Admin</span>
-                 </button>
-               </li>
-               <li>
-                 <button 
-                   onClick={() => setActiveView('analytics')} 
-                   className="text-orange-400 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
-                 >
-                   <span>📊 Live Analytics CMS</span>
-                 </button>
+                   <span>🎮 Play CyberWrap 3D</span>
+                 </a>
                </li>
              </ul>
           </div>
@@ -1903,8 +1985,16 @@ export default function App() {
 
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 md:px-8 pt-8 mt-8 border-t border-stone-900 text-center text-stone-500 flex flex-col sm:flex-row justify-center items-center gap-4">
+        <div className="max-w-6xl mx-auto px-4 md:px-8 pt-8 mt-8 border-t border-stone-900 text-center text-stone-500 flex flex-col sm:flex-row justify-between items-center gap-4">
            <p>© 2026 DailyBread Shawarma. All rights reserved. Made originally for Buea, Cameroon.</p>
+           <button
+             onClick={() => setActiveView('analytics')}
+             className="text-stone-600 hover:text-stone-400 text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer"
+             title="Authorized Staff & Administration Portal"
+           >
+             <Lock size={12} />
+             <span>Staff & Admin Portal</span>
+           </button>
         </div>
       </footer>
 
@@ -2012,10 +2102,34 @@ export default function App() {
                   
                   {/* Coupon Code Application Box */}
                   <div className="bg-stone-50/90 p-3.5 rounded-2xl border border-stone-200/80 space-y-2.5 font-sans" id="coupon-apply-section">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-brand-text">
-                      <Tag size={13} className="text-brand-primary" />
-                      <span>Have a Coupon Code?</span>
+                    <div className="flex items-center justify-between gap-1.5 text-xs font-bold text-brand-text">
+                      <div className="flex items-center gap-1.5">
+                        <Tag size={13} className="text-brand-primary" />
+                        <span>Have a Coupon Code?</span>
+                      </div>
                     </div>
+
+                    {/* Active CyberWrap coupon prompt (1-click apply) */}
+                    {!appliedCoupon && unappliedCyberwrapCoupon && (
+                      <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-300 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-sm">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-amber-950 flex items-center gap-1">
+                            <Sparkles size={13} className="text-amber-600 shrink-0" />
+                            <span>🎉 You have an active CyberWrap coupon!</span>
+                          </p>
+                          <p className="text-[11px] font-mono font-bold text-amber-800 tracking-wide mt-0.5">
+                            {unappliedCyberwrapCoupon.code_hash} (-{unappliedCyberwrapCoupon.discount_percent}% OFF)
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleApplyCoupon(unappliedCyberwrapCoupon.code_hash)}
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg shrink-0 transition-colors shadow-sm cursor-pointer font-sans"
+                        >
+                          Apply to Order
+                        </button>
+                      </div>
+                    )}
 
                     {appliedCoupon ? (
                       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center justify-between gap-2 animate-in fade-in duration-150">
@@ -2095,20 +2209,25 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* CyberWrap Play to win coupon helper */}
-                        <div className="pt-1.5 flex items-center justify-between text-[11px] text-stone-500 border-t border-stone-200/60">
-                          <span>Don't have a coupon?</span>
-                          <a
-                            href="https://cyberwrap.dailybreadshawarma.store"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-amber-700 hover:text-amber-900 font-bold hover:underline inline-flex items-center gap-1 transition-colors"
-                          >
-                            <Gamepad2 size={11} className="text-amber-600" />
-                            <span>Play CyberWrap for 20% off</span>
-                            <ExternalLink size={10} />
-                          </a>
-                        </div>
+                        {/* CyberWrap in-cart cross-sell helper */}
+                        {!unappliedCyberwrapCoupon && (
+                          <div className="pt-2 flex items-center justify-between text-xs text-stone-600 border-t border-stone-200/60">
+                            <span className="font-sans">Want 20% OFF your next order?</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                recordCyberWrapLaunchClick('cart');
+                                logAnalyticsEvent('cyberwrap_launch_clicked', undefined, { placement: 'cart' });
+                                window.open(buildCyberWrapLaunchUrl('cart'), '_blank', 'noopener,noreferrer');
+                              }}
+                              className="text-orange-700 hover:text-orange-900 font-bold hover:underline inline-flex items-center gap-1 transition-colors cursor-pointer font-ui"
+                            >
+                              <Gamepad2 size={12} className="text-orange-600" />
+                              <span>Take today&apos;s Daily Run</span>
+                              <ExternalLink size={10} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2135,6 +2254,11 @@ export default function App() {
                       <span className="text-xl font-bold text-brand-primary">{totalCartPrice} XAF</span>
                     </div>
                   </div>
+
+                  {/* Subtle non-blocking post-order teaser prompt */}
+                  <p className="text-[11px] text-center text-stone-500 font-sans">
+                    💡 Completing this order qualifies you for bonus points on your next Daily Run!
+                  </p>
 
                   <div className="grid grid-cols-2 gap-2">
                     <button
@@ -2168,15 +2292,14 @@ export default function App() {
       {/* 11. Sticky WhatsApp & Click-to-Call Buttons for mobile overlay */}
       <div className="fixed bottom-0 inset-x-0 bg-white border-t border-brand-text/10 p-2.5 flex sm:hidden justify-between items-center gap-2 z-30 shadow-2xl font-ui">
          
-         {/* Mobile Analytics toggle */}
-         <button
-           onClick={() => setActiveView('analytics')}
-           className="bg-[#161b22] text-orange-400 border border-orange-500/30 py-3 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
-           title="View Live Analytics"
+         {/* Mobile Play Game CTA */}
+         <a
+           href="#play-cyberwrap"
+           className="bg-amber-50 text-orange-600 border border-orange-300/60 py-3 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-transform"
+           title="Play CyberWrap WebGL Delivery Game"
          >
-           <Activity size={14} className="text-orange-400 animate-pulse" />
-           <span>Analytics</span>
-         </button>
+           <span>🎮 Play</span>
+         </a>
 
          {/* Mobile Click-to-Call direct anchor link */}
          <a 
@@ -2200,6 +2323,13 @@ export default function App() {
          </a>
 
       </div>
+
+      {/* Post-Order CyberWrap Game Engagement Modal */}
+      <PostOrderEngagementModal 
+        isOpen={showPostOrderModal}
+        onClose={() => setShowPostOrderModal(false)}
+        source="post_order_modal"
+      />
 
     </div>
   );

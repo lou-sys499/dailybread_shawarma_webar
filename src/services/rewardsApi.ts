@@ -8,7 +8,38 @@ import {
   CouponStatus
 } from '../types/rewards';
 
+export type { CyberwrapCoupon };
+
 export const rewardsApi = {
+  /**
+   * Helper to retrieve locally stored player identity if available on this device,
+   * including query parameters when returning from external CyberWrap game.
+   */
+  getLocalPlayerId(): string | null {
+    if (typeof window === 'undefined') return null;
+
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlPlayerId = params.get('player_id') || params.get('playerId');
+      if (urlPlayerId && urlPlayerId.trim()) {
+        const clean = urlPlayerId.trim();
+        localStorage.setItem('cyberwrap_player_id', clean);
+        localStorage.setItem('cyberwrap_last_player_id', clean);
+        return clean;
+      }
+    } catch {}
+
+    try {
+      return localStorage.getItem('cyberwrap_player_id') || 
+             localStorage.getItem('cyberwrap_last_player_id') || 
+             sessionStorage.getItem('cyberwrap_player_id') || 
+             sessionStorage.getItem('cyberwrap_last_player_id') || 
+             null;
+    } catch {
+      return null;
+    }
+  },
+
   /**
    * Fetches overall aggregated metrics for the admin rewards dashboard
    */

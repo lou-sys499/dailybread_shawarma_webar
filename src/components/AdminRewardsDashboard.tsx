@@ -75,7 +75,7 @@ export const AdminRewardsDashboard: React.FC<AdminRewardsDashboardProps> = ({
 
   // Simulator Form State
   const [simPlayerId, setSimPlayerId] = useState<string>(() => 'ply_' + Math.floor(Math.random() * 9000 + 1000));
-  const [simScore, setSimScore] = useState<number>(750);
+  const [simScore, setSimScore] = useState<number>(250);
   const [simSessionId, setSimSessionId] = useState<string>(() => 'sess_' + Math.floor(Math.random() * 9000 + 1000));
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [simulationResult, setSimulationResult] = useState<ClaimScoreResult | null>(null);
@@ -824,7 +824,7 @@ export const AdminRewardsDashboard: React.FC<AdminRewardsDashboardProps> = ({
                       onChange={(e) => setSimScore(Number(e.target.value))}
                       className="w-full bg-[#0d1117] border border-slate-700 rounded-xl px-3.5 py-2 text-xs font-mono text-white focus:outline-none focus:border-orange-500"
                       min={10}
-                      max={5000}
+                      max={2000}
                       required
                     />
                   </div>
