@@ -44,11 +44,21 @@ export const rewardsApi = {
    * Fetches overall aggregated metrics for the admin rewards dashboard
    */
   async getOverview(): Promise<RewardsOverviewResponse> {
-    const res = await fetch('/api/admin/rewards/overview');
-    if (!res.ok) {
+    try {
+      const res = await fetch('/api/admin/rewards/overview');
+      if (res.ok) {
+        return await res.json();
+      }
+      // Try fallback route
+      const fallbackRes = await fetch('/api/rewards/overview');
+      if (fallbackRes.ok) {
+        return await fallbackRes.json();
+      }
       throw new Error(`Failed to fetch rewards overview (${res.status})`);
+    } catch (err: any) {
+      console.warn('Rewards overview API call encountered error:', err.message);
+      throw err;
     }
-    return res.json();
   },
 
   /**

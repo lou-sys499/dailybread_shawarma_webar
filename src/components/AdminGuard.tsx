@@ -164,12 +164,13 @@ export const AdminGuard: React.FC<AdminGuardProps> = ({ children, onBackToHome, 
                 type="password"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Enter password or leave blank for demo"
+                placeholder="Enter admin password (e.g. dailybread@99)"
                 className="w-full bg-[#0d1117] border border-slate-700 focus:border-orange-500 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none transition-colors"
+                required
               />
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Tip: Enter <code className="text-orange-400 bg-slate-800 px-1 py-0.5 rounded">admin</code> for quick developer clearance.
+              Admin Key: <code className="text-orange-400 bg-slate-800 px-1 py-0.5 rounded font-mono">dailybread@99</code>
             </p>
           </div>
 

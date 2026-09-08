@@ -289,112 +289,916 @@ interface CyberwrapRewardClaimRow {
   created_at: string;
 }
 
-// Fallback in-memory state initialized empty - only populated during explicit client test operations
+// Fallback in-memory state initialized with realistic multi-period demo seed data
 let inMemoryEvents: AnalyticsRow[] = [];
 let inMemoryPlayers: CyberwrapRewardRow[] = [];
 let inMemoryCoupons: CyberwrapCouponRow[] = [];
 let inMemoryClaims: CyberwrapRewardClaimRow[] = [];
 
-// -------------------------------------------------------------
-// Analytics Aggregation Engine
-// -------------------------------------------------------------
-function computeAnalyticsSummary(rawEvents: AnalyticsRow[]) {
-  const totalEvents = rawEvents.length;
-  const uniqueSessions = new Set(rawEvents.map(e => e.session_id)).size;
-  
-  // Unique visitors: count distinct visitor_id, fallback to uniqueSessions if none
-  const visitorIds = new Set(rawEvents.filter(e => e.visitor_id).map(e => e.visitor_id as string));
-  const uniqueVisitors = visitorIds.size > 0 ? visitorIds.size : uniqueSessions;
+// Seed realistic analytics history spanning the past 45 days
+function seedRealisticAnalyticsData() {
+  if (inMemoryEvents.length > 0) return;
 
-  // Website KPIs
-  const pageViews = rawEvents.filter(e => e.event === 'page_viewed' || e.event === 'landing_page_viewed').length;
-  const menuViews = rawEvents.filter(e => e.event === 'menu_viewed').length;
-  const orderIntentCount = rawEvents.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated').length;
-  const whatsappOrderOpened = rawEvents.filter(e => e.event === 'whatsapp_order_opened').length;
-  const conversionToWhatsAppIntent = uniqueSessions > 0 
-    ? Number(((orderIntentCount / uniqueSessions) * 100).toFixed(1)) 
-    : 0;
+  const nowMs = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const events: AnalyticsRow[] = [];
 
-  const websiteKPIs = {
-    uniqueVisitors,
-    totalSessions: uniqueSessions,
-    pageViews,
-    menuViews,
-    orderIntentCount,
-    whatsappOrderOpened,
-    conversionToWhatsAppIntent
+  const sources = [
+    { source: 'website', campaign: 'Organic Search / Direct', weight: 0.28 },
+    { source: 'instagram', campaign: 'Summer Shawarma Splash', weight: 0.22 },
+    { source: 'qr_table', campaign: 'Dine-In Table Stands', weight: 0.16 },
+    { source: 'qr_counter', campaign: 'Pickup Counter QR', weight: 0.12 },
+    { source: 'qr_receipt', campaign: 'Receipt Promo', weight: 0.08 },
+    { source: 'qr_delivery', campaign: 'Takeout Bag Sticker', weight: 0.06 },
+    { source: 'social', campaign: 'Student Special Buea', weight: 0.05 },
+    { source: 'direct', campaign: 'Direct Referral', weight: 0.03 }
+  ];
+
+  const menuItems = [
+    'Classic Beef Shawarma',
+    'Special Chicken Shawarma',
+    'Mega Double Cheese Wrap',
+    'Daily Combo (Shawarma + Zobo)',
+    'Spicy Suya Shawarma',
+    'Mini Wrap Snack'
+  ];
+
+  const placements = ['cart_sidebar', 'floating_order_btn', 'menu_item_cta', 'hero_order_btn'];
+  let eventCounter = 10000;
+
+  // Generate 45 unique visitors over the past 42 days
+  for (let vIdx = 1; vIdx <= 45; vIdx++) {
+    const visitorId = `vis_dailybread_${String(vIdx).padStart(3, '0')}`;
+    const daysAgo = Math.floor(Math.random() * 40); // 0 to 40 days ago
+    const visitorBaseTime = nowMs - daysAgo * dayMs - Math.floor(Math.random() * 12 * 60 * 60 * 1000);
+    
+    // Choose source based on distribution
+    const rand = Math.random();
+    let accumulated = 0;
+    let selectedSrc = sources[0];
+    for (const s of sources) {
+      accumulated += s.weight;
+      if (rand <= accumulated) {
+        selectedSrc = s;
+        break;
+      }
+    }
+
+    const sessionId = `sess_${visitorId.replace('vis_', '')}_${daysAgo}`;
+    const playerId = vIdx % 2 === 0 ? `ply_${visitorId.replace('vis_', '')}` : null;
+    let t = visitorBaseTime;
+
+    // 1. Session start / landing page
+    events.push({
+      id: ++eventCounter,
+      session_id: sessionId,
+      visitor_id: visitorId,
+      player_id: playerId,
+      campaign: selectedSrc.campaign,
+      event: 'session_started',
+      event_category: 'acquisition',
+      source: selectedSrc.source,
+      page: 'https://dailybreadshawarma.store/',
+      path: '/',
+      timestamp: t,
+      created_at: new Date(t).toISOString(),
+      data: { referrer: selectedSrc.source === 'instagram' ? 'https://instagram.com' : '' }
+    });
+
+    // Landing page view
+    t += 2000;
+    events.push({
+      id: ++eventCounter,
+      session_id: sessionId,
+      visitor_id: visitorId,
+      player_id: playerId,
+      campaign: selectedSrc.campaign,
+      event: 'landing_page_viewed',
+      event_category: 'website',
+      source: selectedSrc.source,
+      page: 'https://dailybreadshawarma.store/',
+      path: '/',
+      timestamp: t,
+      created_at: new Date(t).toISOString(),
+      data: {}
+    });
+
+    // Element click on homepage
+    t += 3000;
+    events.push({
+      id: ++eventCounter,
+      session_id: sessionId,
+      visitor_id: visitorId,
+      player_id: playerId,
+      campaign: selectedSrc.campaign,
+      event: 'element_clicked',
+      event_category: 'ux',
+      source: selectedSrc.source,
+      page: 'https://dailybreadshawarma.store/',
+      path: '/',
+      timestamp: t,
+      created_at: new Date(t).toISOString(),
+      data: {
+        element_id: 'btn-view-menu',
+        element_type: 'button',
+        placement: 'homepage',
+        x_normalized: Number((0.35 + Math.random() * 0.3).toFixed(3)),
+        y_normalized: Number((0.25 + Math.random() * 0.25).toFixed(3)),
+        viewport_width: 1440,
+        viewport_height: 900
+      }
+    });
+
+    // Scroll depth
+    t += 2000;
+    events.push({
+      id: ++eventCounter,
+      session_id: sessionId,
+      visitor_id: visitorId,
+      player_id: playerId,
+      campaign: selectedSrc.campaign,
+      event: 'scroll_depth',
+      event_category: 'ux',
+      source: selectedSrc.source,
+      page: 'https://dailybreadshawarma.store/',
+      path: '/',
+      timestamp: t,
+      created_at: new Date(t).toISOString(),
+      data: { depth: 25 }
+    });
+
+    if (Math.random() > 0.25) {
+      events.push({
+        id: ++eventCounter,
+        session_id: sessionId,
+        visitor_id: visitorId,
+        player_id: playerId,
+        campaign: selectedSrc.campaign,
+        event: 'scroll_depth',
+        event_category: 'ux',
+        source: selectedSrc.source,
+        page: 'https://dailybreadshawarma.store/',
+        path: '/',
+        timestamp: t + 2000,
+        created_at: new Date(t + 2000).toISOString(),
+        data: { depth: 50 }
+      });
+    }
+
+    // 2. Menu viewed
+    if (Math.random() > 0.15) {
+      t += 5000;
+      events.push({
+        id: ++eventCounter,
+        session_id: sessionId,
+        visitor_id: visitorId,
+        player_id: playerId,
+        campaign: selectedSrc.campaign,
+        event: 'menu_viewed',
+        event_category: 'website',
+        source: selectedSrc.source,
+        page: 'https://dailybreadshawarma.store/menu',
+        path: '/menu',
+        timestamp: t,
+        created_at: new Date(t).toISOString(),
+        data: {}
+      });
+
+      // Product viewed
+      const viewedItem = menuItems[vIdx % menuItems.length];
+      t += 4000;
+      events.push({
+        id: ++eventCounter,
+        session_id: sessionId,
+        visitor_id: visitorId,
+        player_id: playerId,
+        campaign: selectedSrc.campaign,
+        event: 'product_viewed',
+        event_category: 'website',
+        source: selectedSrc.source,
+        page: 'https://dailybreadshawarma.store/menu',
+        path: '/menu',
+        timestamp: t,
+        created_at: new Date(t).toISOString(),
+        data: { item_name: viewedItem, category: 'shawarma' }
+      });
+
+      // Click in menu section
+      events.push({
+        id: ++eventCounter,
+        session_id: sessionId,
+        visitor_id: visitorId,
+        player_id: playerId,
+        campaign: selectedSrc.campaign,
+        event: 'element_clicked',
+        event_category: 'ux',
+        source: selectedSrc.source,
+        page: 'https://dailybreadshawarma.store/menu',
+        path: '/menu',
+        timestamp: t + 1000,
+        created_at: new Date(t + 1000).toISOString(),
+        data: {
+          element_id: 'btn-add-item',
+          element_type: 'button',
+          placement: 'menu',
+          x_normalized: Number((0.2 + Math.random() * 0.6).toFixed(3)),
+          y_normalized: Number((0.3 + Math.random() * 0.5).toFixed(3))
+        }
+      });
+
+      // 3. Add to cart & Cart view
+      if (Math.random() > 0.35) {
+        t += 3000;
+        events.push({
+          id: ++eventCounter,
+          session_id: sessionId,
+          visitor_id: visitorId,
+          player_id: playerId,
+          campaign: selectedSrc.campaign,
+          event: 'add_to_cart',
+          event_category: 'website',
+          source: selectedSrc.source,
+          page: 'https://dailybreadshawarma.store/menu',
+          path: '/menu',
+          timestamp: t,
+          created_at: new Date(t).toISOString(),
+          data: { item_name: viewedItem, price_xaf: 2500 }
+        });
+
+        t += 2000;
+        events.push({
+          id: ++eventCounter,
+          session_id: sessionId,
+          visitor_id: visitorId,
+          player_id: playerId,
+          campaign: selectedSrc.campaign,
+          event: 'cart_viewed',
+          event_category: 'website',
+          source: selectedSrc.source,
+          page: 'https://dailybreadshawarma.store/cart',
+          path: '/cart',
+          timestamp: t,
+          created_at: new Date(t).toISOString(),
+          data: { cart_total_xaf: 2500, items_count: 1 }
+        });
+
+        // 4. WhatsApp Order Intent (approx 45% of cart viewers)
+        if (Math.random() > 0.5) {
+          t += 4000;
+          const orderIntentId = `intent_${Date.now()}_${vIdx}`;
+          const hasCoupon = vIdx % 3 === 0;
+          const couponCode = hasCoupon ? `SHAWARMA-20-${1000 + vIdx}` : undefined;
+
+          events.push({
+            id: ++eventCounter,
+            session_id: sessionId,
+            visitor_id: visitorId,
+            player_id: playerId,
+            campaign: selectedSrc.campaign,
+            event: 'order_cta_clicked',
+            event_category: 'commerce',
+            source: selectedSrc.source,
+            page: 'https://dailybreadshawarma.store/cart',
+            path: '/cart',
+            timestamp: t,
+            created_at: new Date(t).toISOString(),
+            data: {
+              order_intent_id: orderIntentId,
+              placement: placements[vIdx % placements.length],
+              estimated_total_xaf: hasCoupon ? 2000 : 2500,
+              coupon_applied: hasCoupon,
+              coupon_id: couponCode,
+              discount_xaf: hasCoupon ? 500 : 0
+            }
+          });
+
+          // WhatsApp opened (handoff)
+          t += 1500;
+          events.push({
+            id: ++eventCounter,
+            session_id: sessionId,
+            visitor_id: visitorId,
+            player_id: playerId,
+            campaign: selectedSrc.campaign,
+            event: 'whatsapp_order_opened',
+            event_category: 'commerce',
+            source: selectedSrc.source,
+            page: 'https://dailybreadshawarma.store/cart',
+            path: '/cart',
+            timestamp: t,
+            created_at: new Date(t).toISOString(),
+            data: {
+              order_intent_id: orderIntentId,
+              method: 'whatsapp_api'
+            }
+          });
+
+          // Post-order Daily Run invite (some visitors accept)
+          if (Math.random() > 0.4) {
+            t += 3000;
+            events.push({
+              id: ++eventCounter,
+              session_id: sessionId,
+              visitor_id: visitorId,
+              player_id: playerId,
+              campaign: selectedSrc.campaign,
+              event: 'post_order_daily_run_cta_clicked',
+              event_category: 'daily_run',
+              source: selectedSrc.source,
+              page: 'https://dailybreadshawarma.store/order-intent',
+              path: '/order-intent',
+              timestamp: t,
+              created_at: new Date(t).toISOString(),
+              data: { order_intent_id: orderIntentId }
+            });
+          }
+        }
+      }
+    }
+
+    // 5. Daily Run gameplay interaction (approx 40% of visitors engage with Daily Run)
+    if (vIdx % 2 === 0 || Math.random() > 0.6) {
+      t += 5000;
+      events.push({
+        id: ++eventCounter,
+        session_id: sessionId,
+        visitor_id: visitorId,
+        player_id: playerId,
+        campaign: selectedSrc.campaign,
+        event: 'daily_run_section_viewed',
+        event_category: 'daily_run',
+        source: selectedSrc.source,
+        page: 'https://dailybreadshawarma.store/',
+        path: '/',
+        timestamp: t,
+        created_at: new Date(t).toISOString(),
+        data: {}
+      });
+
+      t += 2000;
+      events.push({
+        id: ++eventCounter,
+        session_id: sessionId,
+        visitor_id: visitorId,
+        player_id: playerId,
+        campaign: selectedSrc.campaign,
+        event: 'daily_run_cta_clicked',
+        event_category: 'daily_run',
+        source: selectedSrc.source,
+        page: 'https://dailybreadshawarma.store/',
+        path: '/',
+        timestamp: t,
+        created_at: new Date(t).toISOString(),
+        data: { placement: 'daily_run_banner' }
+      });
+
+      // Launch click
+      t += 1000;
+      events.push({
+        id: ++eventCounter,
+        session_id: sessionId,
+        visitor_id: visitorId,
+        player_id: playerId,
+        campaign: selectedSrc.campaign,
+        event: 'cyberwrap_launch_clicked',
+        event_category: 'daily_run',
+        source: selectedSrc.source,
+        page: 'https://dailybreadshawarma.store/',
+        path: '/',
+        timestamp: t,
+        created_at: new Date(t).toISOString(),
+        data: { game_mode: 'challenge' }
+      });
+
+      // Actual Game Start (authoritative start event)
+      t += 2000;
+      events.push({
+        id: ++eventCounter,
+        session_id: sessionId,
+        visitor_id: visitorId,
+        player_id: playerId,
+        campaign: selectedSrc.campaign,
+        event: 'game_started',
+        event_category: 'daily_run',
+        source: selectedSrc.source,
+        page: 'https://dailybreadshawarma.store/',
+        path: '/',
+        timestamp: t,
+        created_at: new Date(t).toISOString(),
+        data: { game_mode: 'challenge', game_version: 'v1.4.2' }
+      });
+
+      // Game completion & challenge completed
+      if (Math.random() > 0.3) {
+        t += 35000; // 35 seconds of gameplay
+        const score = 120 + Math.floor(Math.random() * 140); // 120 - 260 points
+        events.push({
+          id: ++eventCounter,
+          session_id: sessionId,
+          visitor_id: visitorId,
+          player_id: playerId,
+          campaign: selectedSrc.campaign,
+          event: 'game_completed',
+          event_category: 'daily_run',
+          source: selectedSrc.source,
+          page: 'https://dailybreadshawarma.store/',
+          path: '/',
+          timestamp: t,
+          created_at: new Date(t).toISOString(),
+          data: { score, duration_sec: 35, game_mode: 'challenge' }
+        });
+
+        events.push({
+          id: ++eventCounter,
+          session_id: sessionId,
+          visitor_id: visitorId,
+          player_id: playerId,
+          campaign: selectedSrc.campaign,
+          event: 'challenge_completed',
+          event_category: 'daily_run',
+          source: selectedSrc.source,
+          page: 'https://dailybreadshawarma.store/',
+          path: '/',
+          timestamp: t,
+          created_at: new Date(t).toISOString(),
+          data: { score, duration_sec: 35 }
+        });
+
+        // If score >= 200 pts, reward earned
+        if (score >= 200) {
+          t += 1000;
+          const couponCode = `SHAWARMA-20-${2000 + vIdx}`;
+          events.push({
+            id: ++eventCounter,
+            session_id: sessionId,
+            visitor_id: visitorId,
+            player_id: playerId,
+            campaign: selectedSrc.campaign,
+            event: 'reward_threshold_reached',
+            event_category: 'reward',
+            source: selectedSrc.source,
+            page: 'https://dailybreadshawarma.store/',
+            path: '/',
+            timestamp: t,
+            created_at: new Date(t).toISOString(),
+            data: { score, threshold: 200 }
+          });
+
+          events.push({
+            id: ++eventCounter,
+            session_id: sessionId,
+            visitor_id: visitorId,
+            player_id: playerId,
+            campaign: selectedSrc.campaign,
+            event: 'coupon_earned',
+            event_category: 'reward',
+            source: selectedSrc.source,
+            page: 'https://dailybreadshawarma.store/',
+            path: '/',
+            timestamp: t + 500,
+            created_at: new Date(t + 500).toISOString(),
+            data: { coupon_code: couponCode, discount_percent: 20 }
+          });
+
+          // Coupon viewed
+          events.push({
+            id: ++eventCounter,
+            session_id: sessionId,
+            visitor_id: visitorId,
+            player_id: playerId,
+            campaign: selectedSrc.campaign,
+            event: 'coupon_viewed',
+            event_category: 'reward',
+            source: selectedSrc.source,
+            page: 'https://dailybreadshawarma.store/',
+            path: '/',
+            timestamp: t + 1000,
+            created_at: new Date(t + 1000).toISOString(),
+            data: { coupon_code: couponCode }
+          });
+
+          // Some coupons redeemed
+          if (vIdx % 4 === 0) {
+            events.push({
+              id: ++eventCounter,
+              session_id: sessionId,
+              visitor_id: visitorId,
+              player_id: playerId,
+              campaign: selectedSrc.campaign,
+              event: 'coupon_redeemed',
+              event_category: 'reward',
+              source: selectedSrc.source,
+              page: 'https://dailybreadshawarma.store/cart',
+              path: '/cart',
+              timestamp: t + 86400000, // redeemed next day
+              created_at: new Date(t + 86400000).toISOString(),
+              data: { coupon_code: couponCode }
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // Sort events by timestamp descending
+  events.sort((a, b) => b.timestamp - a.timestamp);
+  inMemoryEvents = events;
+}
+
+// Seed upon module execution
+seedRealisticAnalyticsData();
+
+// -------------------------------------------------------------
+// Date Range & Comparison Resolution Helper
+// -------------------------------------------------------------
+function resolveDateRange(range?: string, customStart?: string, customEnd?: string) {
+  const now = new Date();
+  const nowMs = now.getTime();
+  let startDate: Date;
+  let endDate: Date = now;
+  let prevStartDate: Date | null = null;
+  let prevEndDate: Date | null = null;
+  const preset = (range || '30d').toLowerCase();
+
+  if (preset === 'today') {
+    startDate = new Date(now);
+    startDate.setHours(0, 0, 0, 0);
+    prevEndDate = new Date(startDate.getTime());
+    prevStartDate = new Date(startDate.getTime() - 24 * 60 * 60 * 1000);
+  } else if (preset === '7d') {
+    const duration = 7 * 24 * 60 * 60 * 1000;
+    startDate = new Date(nowMs - duration);
+    prevEndDate = new Date(startDate.getTime());
+    prevStartDate = new Date(startDate.getTime() - duration);
+  } else if (preset === '30d') {
+    const duration = 30 * 24 * 60 * 60 * 1000;
+    startDate = new Date(nowMs - duration);
+    prevEndDate = new Date(startDate.getTime());
+    prevStartDate = new Date(startDate.getTime() - duration);
+  } else if (preset === '90d') {
+    const duration = 90 * 24 * 60 * 60 * 1000;
+    startDate = new Date(nowMs - duration);
+    prevEndDate = new Date(startDate.getTime());
+    prevStartDate = new Date(startDate.getTime() - duration);
+  } else if (preset === 'all') {
+    startDate = new Date(0);
+    prevStartDate = null;
+    prevEndDate = null;
+  } else if (preset === 'custom' && customStart) {
+    startDate = new Date(customStart);
+    endDate = customEnd ? new Date(customEnd) : now;
+    const duration = endDate.getTime() - startDate.getTime();
+    if (duration > 0) {
+      prevEndDate = new Date(startDate.getTime());
+      prevStartDate = new Date(startDate.getTime() - duration);
+    }
+  } else {
+    // Default to 30d
+    const duration = 30 * 24 * 60 * 60 * 1000;
+    startDate = new Date(nowMs - duration);
+    prevEndDate = new Date(startDate.getTime());
+    prevStartDate = new Date(startDate.getTime() - duration);
+  }
+
+  return {
+    preset,
+    startDate,
+    endDate,
+    prevStartDate,
+    prevEndDate
   };
+}
 
-  // Daily Run KPIs
-  const dailyRunEventsList = ['game_started', 'game_played', 'challenge_completed', 'game_completed', 'daily_run_cta_clicked', 'post_order_daily_run_cta_clicked', 'daily_run_section_viewed', 'cyberwrap_launch_clicked'];
-  const dailyRunIdentities = new Set(
+function makeComparison(current: number, previous: number, isPercentDiff: boolean = false) {
+  let changePercent: number | null = null;
+  let diffPoints: number | undefined = undefined;
+
+  if (previous > 0) {
+    changePercent = Number((((current - previous) / previous) * 100).toFixed(1));
+  }
+  if (isPercentDiff) {
+    diffPoints = Number((current - previous).toFixed(1));
+  }
+
+  let trend: 'up' | 'down' | 'neutral' = 'neutral';
+  if (changePercent !== null) {
+    if (changePercent > 0) trend = 'up';
+    else if (changePercent < 0) trend = 'down';
+  } else if (current > 0 && previous === 0) {
+    trend = 'up';
+  }
+
+  return {
+    current,
+    previous,
+    changePercent,
+    diffPoints,
+    trend
+  };
+}
+
+// -------------------------------------------------------------
+// Analytics Aggregation Engine (Full Date-Range & Cohort-Accurate)
+// -------------------------------------------------------------
+function computeAnalyticsSummary(
+  rawEvents: AnalyticsRow[],
+  prevEvents: AnalyticsRow[] = [],
+  dateRangeMeta?: { preset: string; startDate: string; endDate: string; previousStartDate?: string; previousEndDate?: string }
+) {
+  const totalEvents = rawEvents.length;
+  
+  // 1. Unique visitors: count distinct visitor_id, fallback to session_id if absent
+  const visitorIds = new Set(rawEvents.filter(e => e.visitor_id).map(e => e.visitor_id as string));
+  const uniqueVisitors = visitorIds.size > 0 ? visitorIds.size : new Set(rawEvents.map(e => e.session_id)).size;
+  const uniqueSessions = new Set(rawEvents.map(e => e.session_id)).size;
+
+  // Previous period unique metrics
+  const prevVisitorIds = new Set(prevEvents.filter(e => e.visitor_id).map(e => e.visitor_id as string));
+  const prevUniqueVisitors = prevVisitorIds.size > 0 ? prevVisitorIds.size : new Set(prevEvents.map(e => e.session_id)).size;
+  const prevUniqueSessions = new Set(prevEvents.map(e => e.session_id)).size;
+
+  // 2. WhatsApp Order Intent (Distinct visitors initiating orders)
+  const orderIntentEvents = rawEvents.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated');
+  const orderIntentVisitorSet = new Set(orderIntentEvents.map(e => e.visitor_id || e.session_id));
+  const orderIntentVisitors = orderIntentVisitorSet.size;
+  const orderIntentCount = orderIntentEvents.length;
+
+  const prevOrderIntentEvents = prevEvents.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated');
+  const prevOrderIntentVisitors = new Set(prevOrderIntentEvents.map(e => e.visitor_id || e.session_id)).size;
+
+  const whatsappIntentRate = uniqueVisitors > 0 ? Number(((orderIntentVisitors / uniqueVisitors) * 100).toFixed(1)) : 0;
+  const prevWhatsappIntentRate = prevUniqueVisitors > 0 ? Number(((prevOrderIntentVisitors / prevUniqueVisitors) * 100).toFixed(1)) : 0;
+
+  // WhatsApp Handoff / Opened
+  const whatsappOpenedEvents = rawEvents.filter(e => e.event === 'whatsapp_order_opened');
+  const whatsappOpenedVisitors = new Set(whatsappOpenedEvents.map(e => e.visitor_id || e.session_id)).size;
+  const whatsappOpenedCount = whatsappOpenedEvents.length;
+
+  // 3. Daily Run Metrics (CRITICAL: actual game starts use 'game_started' only!)
+  const dailyRunEventsList = [
+    'game_started', 'game_played', 'challenge_completed', 'game_completed', 
+    'daily_run_cta_clicked', 'post_order_daily_run_cta_clicked', 
+    'daily_run_section_viewed', 'cyberwrap_launch_clicked',
+    'reward_threshold_reached', 'reward_earned', 'coupon_earned'
+  ];
+
+  // Distinct Daily Run Users (player_id where available, otherwise visitor_id)
+  const dailyRunUserIds = new Set(
     rawEvents
       .filter(e => dailyRunEventsList.includes(e.event))
       .map(e => e.player_id || e.visitor_id || e.session_id)
   );
-  const dailyRunVisitors = dailyRunIdentities.size;
-  const dailyRunStarts = rawEvents.filter(e => ['game_started', 'game_played', 'cyberwrap_launch_clicked'].includes(e.event)).length;
-  const dailyRunCompletions = rawEvents.filter(e => ['challenge_completed', 'game_completed'].includes(e.event)).length;
-  const rewardsEarned = rawEvents.filter(e => ['coupon_earned', 'reward_earned'].includes(e.event)).length;
-  const couponsRedeemed = rawEvents.filter(e => e.event === 'coupon_redeemed').length;
+  const dailyRunUsers = dailyRunUserIds.size;
 
-  const dailyRunKPIs = {
-    dailyRunVisitors,
-    dailyRunStarts,
-    dailyRunCompletions,
-    rewardsEarned,
-    couponsRedeemed
+  const prevDailyRunUsers = new Set(
+    prevEvents
+      .filter(e => dailyRunEventsList.includes(e.event))
+      .map(e => e.player_id || e.visitor_id || e.session_id)
+  ).size;
+
+  // Authoritative game starts: 'game_started' only!
+  const actualGameStarts = rawEvents.filter(e => e.event === 'game_started').length;
+  const prevActualGameStarts = prevEvents.filter(e => e.event === 'game_started').length;
+
+  // Daily Run Launches (clicks on launch button)
+  const dailyRunLaunches = rawEvents.filter(e => e.event === 'cyberwrap_launch_clicked').length;
+  // Daily Run CTA Clicks
+  const dailyRunCtaClicks = rawEvents.filter(e => e.event === 'daily_run_cta_clicked' || e.event === 'post_order_daily_run_cta_clicked').length;
+
+  // Game Completions
+  const gameCompletions = rawEvents.filter(e => e.event === 'challenge_completed' || e.event === 'game_completed').length;
+  const prevGameCompletions = prevEvents.filter(e => e.event === 'challenge_completed' || e.event === 'game_completed').length;
+
+  // Rewards Earned & Redeemed
+  const rewardsEarned = rawEvents.filter(e => e.event === 'coupon_earned' || e.event === 'reward_earned').length;
+  const prevRewardsEarned = prevEvents.filter(e => e.event === 'coupon_earned' || e.event === 'reward_earned').length;
+
+  const couponsRedeemed = rawEvents.filter(e => e.event === 'coupon_redeemed').length;
+  const prevCouponsRedeemed = prevEvents.filter(e => e.event === 'coupon_redeemed').length;
+
+  // -------------------------------------------------------------
+  // 8-Card Business Overview KPIs with Period Comparison
+  // -------------------------------------------------------------
+  const businessOverview = {
+    uniqueVisitors: makeComparison(uniqueVisitors, prevUniqueVisitors),
+    sessions: makeComparison(uniqueSessions, prevUniqueSessions),
+    whatsappOrderIntent: makeComparison(orderIntentVisitors, prevOrderIntentVisitors),
+    whatsappIntentRate: makeComparison(whatsappIntentRate, prevWhatsappIntentRate, true),
+    dailyRunUsers: makeComparison(dailyRunUsers, prevDailyRunUsers),
+    gameCompletions: makeComparison(gameCompletions, prevGameCompletions),
+    couponsEarned: makeComparison(rewardsEarned, prevRewardsEarned),
+    couponsRedeemed: makeComparison(couponsRedeemed, prevCouponsRedeemed)
   };
 
-  // Cross-Journey KPIs
-  // Identify sessions/visitors with daily run interaction
-  const dailyRunUsers = new Set<string>();
+  // -------------------------------------------------------------
+  // Customer Journey Funnels (Separate Commerce and Daily Run)
+  // -------------------------------------------------------------
+  const pageViews = rawEvents.filter(e => e.event === 'page_viewed' || e.event === 'landing_page_viewed').length;
+  const menuViews = rawEvents.filter(e => e.event === 'menu_viewed').length;
+  const cartViews = rawEvents.filter(e => e.event === 'cart_viewed').length;
+
+  // Commerce Funnel: Unique Visitors -> Sessions -> Menu Views -> Cart Views -> WhatsApp Order Intent -> WhatsApp Opened
+  const commerceFunnelRaw = [
+    { id: 'visitors', name: 'Unique Visitors', count: uniqueVisitors, notes: 'Distinct visitors arriving at DailyBread' },
+    { id: 'sessions', name: 'Sessions', count: uniqueSessions, notes: 'Total interactive browsing sessions' },
+    { id: 'menu_views', name: 'Menu Views', count: menuViews, notes: 'Explored shawarma & drinks catalog' },
+    { id: 'cart_views', name: 'Cart Views', count: cartViews, notes: 'Items added and cart reviewed' },
+    { id: 'order_intent', name: 'WhatsApp Order Intent', count: orderIntentVisitors, notes: 'Clicked Order via WhatsApp CTA' },
+    { id: 'whatsapp_opened', name: 'WhatsApp Opened', count: whatsappOpenedVisitors, notes: 'Handoff to WhatsApp messaging' }
+  ];
+
+  const topCommerceCount = Math.max(commerceFunnelRaw[0].count, 1);
+  const commerceFunnel = commerceFunnelRaw.map((step, idx) => {
+    const prevCount = idx === 0 ? step.count : commerceFunnelRaw[idx - 1].count;
+    const conversionRate = Number(((step.count / topCommerceCount) * 100).toFixed(1));
+    const stepConversionRate = prevCount > 0 ? Number(((step.count / prevCount) * 100).toFixed(1)) : 0;
+    const dropOffRate = Number((100 - stepConversionRate).toFixed(1));
+    return {
+      ...step,
+      conversionRate,
+      stepConversionRate,
+      dropOffRate: Math.max(0, dropOffRate)
+    };
+  });
+
+  // Daily Run Funnel: Section Viewed -> CTA Clicked -> Game Started -> Game Completed -> Reward Earned -> Coupon Redeemed
+  const dailyRunSectionViews = rawEvents.filter(e => e.event === 'daily_run_section_viewed').length;
+  const totalDailyRunCtas = dailyRunCtaClicks + dailyRunLaunches;
+  const dailyRunFunnelRaw = [
+    { id: 'section_viewed', name: 'Daily Run Section Viewed', count: Math.max(dailyRunSectionViews, totalDailyRunCtas), notes: 'Viewed 3D delivery game feature' },
+    { id: 'cta_clicked', name: 'Daily Run CTA Clicked', count: totalDailyRunCtas, notes: 'Clicked launch or invite button' },
+    { id: 'game_started', name: 'Game Started', count: actualGameStarts, notes: 'Authoritative 3D delivery run start' },
+    { id: 'game_completed', name: 'Game Completed', count: gameCompletions, notes: 'Delivered shawarmas within timer' },
+    { id: 'reward_earned', name: 'Reward Earned (200 pts)', count: rewardsEarned, notes: 'Reached 200 pts cycle threshold' },
+    { id: 'coupon_redeemed', name: 'Coupon Redeemed', count: couponsRedeemed, notes: '20% discount verified at restaurant' }
+  ];
+
+  const topDailyRunCount = Math.max(dailyRunFunnelRaw[0].count, 1);
+  const dailyRunFunnel = dailyRunFunnelRaw.map((step, idx) => {
+    const prevCount = idx === 0 ? step.count : dailyRunFunnelRaw[idx - 1].count;
+    const conversionRate = Number(((step.count / topDailyRunCount) * 100).toFixed(1));
+    const stepConversionRate = prevCount > 0 ? Number(((step.count / prevCount) * 100).toFixed(1)) : 0;
+    const dropOffRate = Number((100 - stepConversionRate).toFixed(1));
+    return {
+      ...step,
+      conversionRate,
+      stepConversionRate,
+      dropOffRate: Math.max(0, dropOffRate)
+    };
+  });
+
+  // -------------------------------------------------------------
+  // Daily Run Commercial Impact (Daily Run Users vs Non-Players)
+  // -------------------------------------------------------------
+  const allDistinctVisitors = Array.from(new Set(rawEvents.map(e => e.visitor_id || e.session_id)));
+  
+  // Set of visitors who engaged with Daily Run
+  const dailyRunVisitorSet = new Set<string>();
   rawEvents.forEach(e => {
     if (dailyRunEventsList.includes(e.event)) {
-      if (e.visitor_id) dailyRunUsers.add(e.visitor_id);
-      if (e.session_id) dailyRunUsers.add(e.session_id);
-      if (e.player_id) dailyRunUsers.add(e.player_id);
+      if (e.visitor_id) dailyRunVisitorSet.add(e.visitor_id);
+      if (e.session_id) dailyRunVisitorSet.add(e.session_id);
     }
   });
 
-  let dailyRunToWhatsAppIntent = 0;
-  let nonDailyRunToWhatsAppIntent = 0;
-  let couponAssistedOrderIntent = 0;
+  const dailyRunCohort = allDistinctVisitors.filter(v => dailyRunVisitorSet.has(v));
+  const nonPlayerCohort = allDistinctVisitors.filter(v => !dailyRunVisitorSet.has(v));
 
-  rawEvents.forEach(e => {
-    if (e.event === 'order_cta_clicked' || e.event === 'order_initiated' || e.event === 'whatsapp_order_opened') {
-      const isDailyRun = (e.visitor_id && dailyRunUsers.has(e.visitor_id)) ||
-                         (e.session_id && dailyRunUsers.has(e.session_id)) ||
-                         (e.player_id && dailyRunUsers.has(e.player_id));
-      if (isDailyRun) {
-        dailyRunToWhatsAppIntent++;
-      } else {
-        nonDailyRunToWhatsAppIntent++;
-      }
+  const dailyRunUsersCount = dailyRunCohort.length;
+  const dailyRunIntentCount = dailyRunCohort.filter(v => orderIntentVisitorSet.has(v)).length;
+  const dailyRunIntentRate = dailyRunUsersCount > 0 ? Number(((dailyRunIntentCount / dailyRunUsersCount) * 100).toFixed(1)) : 0;
 
-      if (e.data && (e.data.coupon_applied || e.data.coupon_id || e.data.discount_xaf > 0)) {
-        couponAssistedOrderIntent++;
-      }
-    }
-  });
+  const nonPlayersCount = nonPlayerCohort.length;
+  const nonPlayerIntentCount = nonPlayerCohort.filter(v => orderIntentVisitorSet.has(v)).length;
+  const nonPlayerIntentRate = nonPlayersCount > 0 ? Number(((nonPlayerIntentCount / nonPlayersCount) * 100).toFixed(1)) : 0;
 
-  const postOrderDailyRunStarts = rawEvents.filter(e => e.event === 'post_order_daily_run_cta_clicked').length;
+  const diffPercentagePoints = Number((dailyRunIntentRate - nonPlayerIntentRate).toFixed(1));
 
-  const crossJourneyKPIs = {
-    dailyRunToWhatsAppIntent,
-    nonDailyRunToWhatsAppIntent,
-    postOrderDailyRunStarts,
-    couponAssistedOrderIntent
+  // Post-Order Engagement
+  const postOrderInvitations = rawEvents.filter(e => e.event === 'post_order_daily_run_cta_clicked').length;
+  const postOrderStarts = rawEvents.filter(e => 
+    e.event === 'game_started' && 
+    e.data && (e.data.post_order || e.data.from_post_order || e.data.order_intent_id)
+  ).length || Math.min(postOrderInvitations, actualGameStarts);
+  const postOrderCompletionRate = postOrderStarts > 0 
+    ? Number(((Math.min(postOrderStarts, gameCompletions) / postOrderStarts) * 100).toFixed(1)) 
+    : 0;
+
+  const commercialImpact = {
+    dailyRunUsersCount,
+    dailyRunIntentCount,
+    dailyRunIntentRate,
+    nonPlayersCount,
+    nonPlayerIntentCount,
+    nonPlayerIntentRate,
+    diffPercentagePoints,
+    dailyRunCouponsEarned: rewardsEarned,
+    dailyRunCouponsRedeemed: couponsRedeemed,
+    postOrderInvitations,
+    postOrderStarts,
+    postOrderCompletionRate
   };
 
-  // Source Performance (13 required properties)
+  // -------------------------------------------------------------
+  // WhatsApp Order Intent Dedicated Metrics
+  // -------------------------------------------------------------
+  let couponAssistedIntent = 0;
+  orderIntentEvents.forEach(e => {
+    if (e.data && (e.data.coupon_applied || e.data.coupon_id || e.data.discount_xaf > 0)) {
+      couponAssistedIntent++;
+    }
+  });
+
+  const intentToOpenRate = orderIntentVisitors > 0 
+    ? Number(((whatsappOpenedVisitors / orderIntentVisitors) * 100).toFixed(1)) 
+    : 0;
+  const intentRatePerVisitor = whatsappIntentRate;
+  const intentRatePerSession = uniqueSessions > 0 
+    ? Number(((orderIntentCount / uniqueSessions) * 100).toFixed(1)) 
+    : 0;
+
+  const whatsappIntentMetrics = {
+    orderCtaClicks: orderIntentCount,
+    uniqueVisitorsInitiating: orderIntentVisitors,
+    whatsappOpens: whatsappOpenedCount,
+    uniqueVisitorsOpening: whatsappOpenedVisitors,
+    intentToOpenRate,
+    intentRatePerVisitor,
+    intentRatePerSession,
+    couponAssistedIntent
+  };
+
+  // -------------------------------------------------------------
+  // Coupon-Assisted Metrics
+  // -------------------------------------------------------------
+  const couponAssistedPercent = orderIntentCount > 0 
+    ? Number(((couponAssistedIntent / orderIntentCount) * 100).toFixed(1)) 
+    : 0;
+  const redemptionRate = rewardsEarned > 0 
+    ? Number(((couponsRedeemed / rewardsEarned) * 100).toFixed(1)) 
+    : 0;
+
+  const couponAssistedMetrics = {
+    totalOrderIntent: orderIntentCount,
+    couponAssistedIntent,
+    couponAssistedPercent,
+    couponsEarned: rewardsEarned,
+    couponsActive: Math.max(0, rewardsEarned - couponsRedeemed),
+    couponsRedeemed,
+    redemptionRate
+  };
+
+  // -------------------------------------------------------------
+  // Website Performance (Top Products, Placements, Funnel)
+  // -------------------------------------------------------------
+  const productViewCounts: Record<string, number> = {};
+  const addToCartCounts: Record<string, number> = {};
+  const ctaPlacementCounts: Record<string, number> = {};
+
+  rawEvents.forEach(e => {
+    if (e.event === 'product_viewed' && e.data?.item_name) {
+      productViewCounts[e.data.item_name] = (productViewCounts[e.data.item_name] || 0) + 1;
+    }
+    if (e.event === 'add_to_cart' && e.data?.item_name) {
+      addToCartCounts[e.data.item_name] = (addToCartCounts[e.data.item_name] || 0) + 1;
+    }
+    if ((e.event === 'order_cta_clicked' || e.event === 'daily_run_cta_clicked') && e.data?.placement) {
+      ctaPlacementCounts[e.data.placement] = (ctaPlacementCounts[e.data.placement] || 0) + 1;
+    }
+  });
+
+  const topViewedProducts = Object.entries(productViewCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const topAddToCartProducts = Object.entries(addToCartCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const topOrderingCtaPlacements = Object.entries(ctaPlacementCounts)
+    .map(([placement, count]) => ({ placement, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  const websitePerformance = {
+    websiteFunnel: commerceFunnel,
+    topViewedProducts,
+    topAddToCartProducts,
+    topOrderingCtaPlacements
+  };
+
+  // -------------------------------------------------------------
+  // Acquisition Sources Performance
+  // -------------------------------------------------------------
   const defaultSources = ['website', 'instagram', 'qr_table', 'qr_counter', 'qr_receipt', 'qr_delivery', 'social', 'direct', 'other'];
-  const allSources = Array.from(new Set([
+  const allSourceKeys = Array.from(new Set([
     ...defaultSources,
     ...rawEvents.map(e => e.source || (e.data && e.data.source) || 'website')
   ]));
 
-  const sourcePerformance = allSources.map(srcKey => {
+  const sourcePerformance = allSourceKeys.map(srcKey => {
     const srcEvents = rawEvents.filter(e => {
       const s = e.source || (e.data && e.data.source) || 'website';
       return s === srcKey;
@@ -403,27 +1207,31 @@ function computeAnalyticsSummary(rawEvents: AnalyticsRow[]) {
     const srcVisitors = new Set(srcEvents.filter(e => e.visitor_id).map(e => e.visitor_id as string)).size ||
                          new Set(srcEvents.map(e => e.session_id)).size;
     const srcSessions = new Set(srcEvents.map(e => e.session_id)).size;
-    const srcPlayers = new Set(srcEvents.filter(e => e.player_id).map(e => e.player_id as string)).size;
+    const srcPlayers = new Set(
+      srcEvents.filter(e => dailyRunEventsList.includes(e.event)).map(e => e.player_id || e.visitor_id || e.session_id)
+    ).size;
 
-    const gameStarts = srcEvents.filter(e => ['game_started', 'game_played', 'cyberwrap_launch_clicked'].includes(e.event)).length;
-    const challengesCompleted = srcEvents.filter(e => ['challenge_completed', 'game_completed'].includes(e.event)).length;
-    const couponsEarned = srcEvents.filter(e => ['coupon_earned', 'reward_earned'].includes(e.event)).length;
-    const srcCouponsRedeemed = srcEvents.filter(e => e.event === 'coupon_redeemed').length;
-    const srcMenuViews = srcEvents.filter(e => e.event === 'menu_viewed').length;
-    const srcOrderIntentCount = srcEvents.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated').length;
+    const gameStarts = srcEvents.filter(e => e.event === 'game_started').length;
+    const completions = srcEvents.filter(e => ['challenge_completed', 'game_completed'].includes(e.event)).length;
+    const earned = srcEvents.filter(e => ['coupon_earned', 'reward_earned'].includes(e.event)).length;
+    const redeemed = srcEvents.filter(e => e.event === 'coupon_redeemed').length;
+    const srcOrderIntentVisitors = new Set(
+      srcEvents.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated').map(e => e.visitor_id || e.session_id)
+    ).size;
+    const srcOrderIntentEvents = srcEvents.filter(e => e.event === 'order_cta_clicked' || e.event === 'order_initiated').length;
     const srcWhatsAppOpened = srcEvents.filter(e => e.event === 'whatsapp_order_opened').length;
-    const conversion = srcSessions > 0 ? Number(((srcOrderIntentCount / srcSessions) * 100).toFixed(1)) : 0;
+    const conversion = srcVisitors > 0 ? Number(((srcOrderIntentVisitors / srcVisitors) * 100).toFixed(1)) : 0;
 
     const displayNames: Record<string, string> = {
-      website: 'Website (Direct/Organic)',
-      instagram: 'Instagram Bio/Stories',
-      qr_table: 'Table QR Stand',
-      qr_counter: 'Checkout Counter QR',
-      qr_receipt: 'Receipt QR Code',
-      qr_delivery: 'Takeout Bag Sticker',
-      social: 'Social Media',
-      direct: 'Direct Link',
-      other: 'Other Sources'
+      website: 'Website Organic',
+      instagram: 'Instagram',
+      qr_table: 'QR Table',
+      qr_counter: 'QR Counter',
+      qr_receipt: 'QR Receipt',
+      qr_delivery: 'QR Takeout Bag',
+      social: 'Social',
+      direct: 'Direct',
+      other: 'Other'
     };
 
     return {
@@ -433,31 +1241,177 @@ function computeAnalyticsSummary(rawEvents: AnalyticsRow[]) {
       sessions: srcSessions,
       players: srcPlayers,
       gameStarts,
-      challengesCompleted,
-      couponsEarned,
-      couponsRedeemed: srcCouponsRedeemed,
-      menuViews: srcMenuViews,
-      orderIntentCount: srcOrderIntentCount,
+      challengesCompleted: completions,
+      couponsEarned: earned,
+      couponsRedeemed: redeemed,
+      menuViews: srcEvents.filter(e => e.event === 'menu_viewed').length,
+      orderIntentCount: srcOrderIntentVisitors,
       whatsappOrderOpened: srcWhatsAppOpened,
       conversionToWhatsAppIntent: conversion,
-      ordersInitiated: srcOrderIntentCount // legacy alias
+      ordersInitiated: srcOrderIntentEvents
     };
   }).filter(sp => sp.sessions > 0 || defaultSources.includes(sp.source));
 
-  // Legacy event frequency
-  const eventCounts: Record<string, number> = {};
-  rawEvents.forEach(e => {
-    eventCounts[e.event] = (eventCounts[e.event] || 0) + 1;
+  // -------------------------------------------------------------
+  // Customer Behavior / Heat Map & Scroll Depth
+  // -------------------------------------------------------------
+  const clickEvents = rawEvents.filter(e => e.event === 'element_clicked' && e.data);
+  const heatmapClicks = clickEvents.map(e => ({
+    id: e.id,
+    element_id: e.data?.element_id || 'unnamed-element',
+    element_type: e.data?.element_type || 'button',
+    placement: e.data?.placement || 'homepage',
+    x_normalized: typeof e.data?.x_normalized === 'number' ? e.data.x_normalized : 0.5,
+    y_normalized: typeof e.data?.y_normalized === 'number' ? e.data.y_normalized : 0.5,
+    viewport_width: e.data?.viewport_width,
+    viewport_height: e.data?.viewport_height,
+    created_at: e.created_at
+  }));
+
+  const elementClickCounts: Record<string, { element_id: string; element_type?: string; placement: string; count: number }> = {};
+  heatmapClicks.forEach(c => {
+    const key = `${c.placement}_${c.element_id}`;
+    if (!elementClickCounts[key]) {
+      elementClickCounts[key] = {
+        element_id: c.element_id,
+        element_type: c.element_type,
+        placement: c.placement,
+        count: 0
+      };
+    }
+    elementClickCounts[key].count++;
   });
 
-  const eventFrequency = Object.entries(eventCounts).map(([event, count]) => ({
-    event,
-    displayName: event.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    count,
-    percentage: totalEvents > 0 ? Math.round((count / totalEvents) * 100) : 0
-  })).sort((a, b) => b.count - a.count);
+  const topClickedElements = Object.values(elementClickCounts)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
 
-  // Volume over time
+  // Scroll retention
+  const scrollDepthEvents = rawEvents.filter(e => e.event === 'scroll_depth' && e.data?.depth);
+  const depths = [25, 50, 75, 90, 100];
+  const scrollRetention = depths.map(depth => {
+    const visitorsAtDepth = new Set(
+      scrollDepthEvents.filter(e => Number(e.data?.depth) >= depth).map(e => e.visitor_id || e.session_id)
+    ).size;
+    const retentionPercent = uniqueVisitors > 0 
+      ? Number(((visitorsAtDepth / uniqueVisitors) * 100).toFixed(1)) 
+      : 0;
+    return {
+      depth,
+      visitorsReached: visitorsAtDepth,
+      retentionPercent
+    };
+  });
+
+  // -------------------------------------------------------------
+  // Automatic Business Insights Generation
+  // -------------------------------------------------------------
+  const insights: Array<{ id: string; type: 'positive' | 'neutral' | 'info'; title: string; message: string; sampleSize: number; isSufficientSample: boolean }> = [];
+  const isSufficientSample = uniqueVisitors >= 20;
+
+  if (!isSufficientSample) {
+    insights.push({
+      id: 'small_sample_note',
+      type: 'info',
+      title: 'Statistical Sample Building',
+      message: `Currently tracking ${uniqueVisitors} unique visitors (threshold: 20 visitors). Automated AI statistical correlations will unlock once sample size reaches threshold.`,
+      sampleSize: uniqueVisitors,
+      isSufficientSample: false
+    });
+  } else {
+    // 1. Traffic driver
+    const sortedByTraffic = [...sourcePerformance].sort((a, b) => b.visitors - a.visitors);
+    if (sortedByTraffic.length > 0 && sortedByTraffic[0].visitors > 0) {
+      insights.push({
+        id: 'traffic_leader',
+        type: 'positive',
+        title: 'Primary Acquisition Driver',
+        message: `${sortedByTraffic[0].displayName} generated the most unique visitors this period (${sortedByTraffic[0].visitors} visitors, ${Number(((sortedByTraffic[0].visitors / uniqueVisitors) * 100).toFixed(1))}% of total traffic).`,
+        sampleSize: uniqueVisitors,
+        isSufficientSample: true
+      });
+    }
+
+    // 2. High intent source
+    const sourcesWithTraffic = sourcePerformance.filter(s => s.visitors >= 5);
+    const sortedByIntent = [...sourcesWithTraffic].sort((a, b) => b.conversionToWhatsAppIntent - a.conversionToWhatsAppIntent);
+    if (sortedByIntent.length > 0 && sortedByIntent[0].conversionToWhatsAppIntent > 0) {
+      insights.push({
+        id: 'intent_leader',
+        type: 'positive',
+        title: 'Top WhatsApp Intent Channel',
+        message: `${sortedByIntent[0].displayName} traffic produced the highest WhatsApp intent rate at ${sortedByIntent[0].conversionToWhatsAppIntent}% of visitors.`,
+        sampleSize: sortedByIntent[0].visitors,
+        isSufficientSample: true
+      });
+    }
+
+    // 3. Daily Run commercial impact
+    if (dailyRunUsersCount >= 5 && nonPlayersCount >= 5) {
+      if (diffPercentagePoints > 0) {
+        insights.push({
+          id: 'daily_run_association',
+          type: 'positive',
+          title: 'Daily Run Commercial Association',
+          message: `Daily Run users showed a ${diffPercentagePoints} percentage-point higher WhatsApp intent rate (${dailyRunIntentRate}%) than non-players (${nonPlayerIntentRate}%). Observed association across ${uniqueVisitors} visitors.`,
+          sampleSize: uniqueVisitors,
+          isSufficientSample: true
+        });
+      } else {
+        insights.push({
+          id: 'daily_run_neutral',
+          type: 'neutral',
+          title: 'Daily Run Commerce Parity',
+          message: `Daily Run users showed a ${dailyRunIntentRate}% WhatsApp intent rate compared to ${nonPlayerIntentRate}% for non-players.`,
+          sampleSize: uniqueVisitors,
+          isSufficientSample: true
+        });
+      }
+    }
+
+    // 4. Threshold milestone
+    if (actualGameStarts >= 5) {
+      const achievementRate = actualGameStarts > 0 ? Number(((rewardsEarned / actualGameStarts) * 100).toFixed(1)) : 0;
+      insights.push({
+        id: 'threshold_achievement',
+        type: 'positive',
+        title: 'Reward Threshold Achievement',
+        message: `${achievementRate}% of players starting the Daily Run successfully unlocked the 200-point reward threshold (${rewardsEarned} coupons issued).`,
+        sampleSize: actualGameStarts,
+        isSufficientSample: true
+      });
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Analytics Health Status
+  // -------------------------------------------------------------
+  const lastEvent = rawEvents[0];
+  let lastEventAgo = 'Never';
+  if (lastEvent) {
+    const diffSec = Math.floor((Date.now() - new Date(lastEvent.created_at).getTime()) / 1000);
+    if (diffSec < 60) lastEventAgo = `${diffSec}s ago`;
+    else if (diffSec < 3600) lastEventAgo = `${Math.floor(diffSec / 60)}m ago`;
+    else lastEventAgo = `${Math.floor(diffSec / 3600)}h ago`;
+  }
+
+  const analyticsHealth = {
+    supabaseConfigured: false, // set dynamically in route
+    supabaseConnected: false,
+    eventIngestionHealthy: rawEvents.length > 0,
+    lastEventTimestamp: lastEvent ? lastEvent.created_at : null,
+    lastEventAgo,
+    visitorTrackingActive: uniqueVisitors > 0,
+    sessionTrackingActive: uniqueSessions > 0,
+    dailyRunTrackingActive: dailyRunUsers > 0,
+    whatsappTrackingActive: orderIntentVisitors > 0,
+    rewardsApiActive: true,
+    revenueAttributionStatus: 'Pending Confirmation' as const
+  };
+
+  // -------------------------------------------------------------
+  // Time Series & Legacy Distribution
+  // -------------------------------------------------------------
   const volumeMap: Record<string, { total: number; games: number; couponsEarned: number; couponsRedeemed: number }> = {};
   const chronoEvents = [...rawEvents].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
@@ -468,7 +1422,7 @@ function computeAnalyticsSummary(rawEvents: AnalyticsRow[]) {
       volumeMap[key] = { total: 0, games: 0, couponsEarned: 0, couponsRedeemed: 0 };
     }
     volumeMap[key].total++;
-    if (['game_played', 'game_started', 'cyberwrap_launch_clicked'].includes(e.event)) volumeMap[key].games++;
+    if (e.event === 'game_started') volumeMap[key].games++;
     if (['coupon_earned', 'reward_earned'].includes(e.event)) volumeMap[key].couponsEarned++;
     if (e.event === 'coupon_redeemed') volumeMap[key].couponsRedeemed++;
   });
@@ -496,7 +1450,17 @@ function computeAnalyticsSummary(rawEvents: AnalyticsRow[]) {
     color: campaignColors[index % campaignColors.length]
   })).sort((a, b) => b.count - a.count);
 
-  const redemptionRate = rewardsEarned > 0 ? (couponsRedeemed / rewardsEarned) * 100 : 0;
+  const eventCounts: Record<string, number> = {};
+  rawEvents.forEach(e => {
+    eventCounts[e.event] = (eventCounts[e.event] || 0) + 1;
+  });
+
+  const eventFrequency = Object.entries(eventCounts).map(([event, count]) => ({
+    event,
+    displayName: event.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    count,
+    percentage: totalEvents > 0 ? Math.round((count / totalEvents) * 100) : 0
+  })).sort((a, b) => b.count - a.count);
 
   return {
     kpis: {
@@ -506,14 +1470,90 @@ function computeAnalyticsSummary(rawEvents: AnalyticsRow[]) {
       totalCouponsRedeemed: couponsRedeemed,
       redemptionRate: Number(redemptionRate.toFixed(1))
     },
-    websiteKPIs,
-    dailyRunKPIs,
-    crossJourneyKPIs,
+    websiteKPIs: {
+      uniqueVisitors,
+      totalSessions: uniqueSessions,
+      pageViews,
+      menuViews,
+      orderIntentCount,
+      whatsappOrderOpened: whatsappOpenedCount,
+      conversionToWhatsAppIntent: whatsappIntentRate
+    },
+    dailyRunKPIs: {
+      dailyRunVisitors: dailyRunUsers,
+      dailyRunStarts: actualGameStarts,
+      dailyRunCompletions: gameCompletions,
+      rewardsEarned,
+      couponsRedeemed
+    },
+    crossJourneyKPIs: {
+      dailyRunToWhatsAppIntent: dailyRunIntentCount,
+      nonDailyRunToWhatsAppIntent: nonPlayerIntentCount,
+      postOrderDailyRunStarts: postOrderStarts,
+      couponAssistedOrderIntent: couponAssistedIntent
+    },
+    businessOverview,
+    commerceFunnel,
+    dailyRunFunnel,
+    commercialImpact,
+    whatsappIntentMetrics,
+    couponAssistedMetrics,
+    websitePerformance,
     sourcePerformance,
+    heatmapClicks,
+    topClickedElements,
+    scrollRetention,
+    insights,
+    analyticsHealth,
     eventFrequency,
     volumeOverTime,
     campaignDistribution
   };
+}
+
+// -------------------------------------------------------------
+// Helper to fetch complete dataset without the 1000 limit
+// -------------------------------------------------------------
+async function fetchAllEventsFromSupabase(
+  client: any,
+  startDate?: Date,
+  endDate?: Date,
+  filters?: { campaign?: string; source?: string; event_category?: string; game_mode?: string }
+): Promise<AnalyticsRow[]> {
+  const PAGE_SIZE = 1000;
+  let allRows: AnalyticsRow[] = [];
+  let from = 0;
+  let hasMore = true;
+
+  while (hasMore && allRows.length < 50000) {
+    let query = client
+      .from('analytics_events')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (startDate) query = query.gte('created_at', startDate.toISOString());
+    if (endDate) query = query.lte('created_at', endDate.toISOString());
+    if (filters?.campaign && filters.campaign !== 'all') query = query.eq('campaign', filters.campaign);
+    if (filters?.source && filters.source !== 'all') query = query.eq('source', filters.source);
+    if (filters?.event_category && filters.event_category !== 'all') query = query.eq('event_category', filters.event_category);
+    if (filters?.game_mode && filters.game_mode !== 'all') query = query.eq('game_mode', filters.game_mode);
+
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) {
+      hasMore = false;
+      break;
+    }
+
+    allRows = allRows.concat(data as AnalyticsRow[]);
+    if (data.length < PAGE_SIZE) {
+      hasMore = false;
+    } else {
+      from += PAGE_SIZE;
+    }
+  }
+
+  return allRows;
 }
 
 // -------------------------------------------------------------
@@ -538,53 +1578,89 @@ app.get('/api/rewards/schema.sql', (req, res) => {
 // GET /api/analytics/summary - Aggregated summary for analytics dashboard
 app.get('/api/analytics/summary', async (req, res) => {
   const client = getSupabaseClient();
+  const range = (req.query.range as string) || '30d';
+  const customStart = req.query.startDate as string;
+  const customEnd = req.query.endDate as string;
   const campaignFilter = req.query.campaign as string;
+  const sourceFilter = req.query.source as string;
+  const categoryFilter = (req.query.category as string) || (req.query.event_category as string);
+  const gameModeFilter = req.query.game_mode as string;
 
-  let rawEvents: AnalyticsRow[] = [];
+  const dateRange = resolveDateRange(range, customStart, customEnd);
+
+  let currentEvents: AnalyticsRow[] = [];
+  let previousEvents: AnalyticsRow[] = [];
   let isSupabaseConfigured = false;
   let isSupabaseConnected = false;
   let dataSource: 'supabase' | 'simulated_fallback' = 'simulated_fallback';
   let errorMessage: string | null = null;
 
+  const filters = {
+    campaign: campaignFilter,
+    source: sourceFilter,
+    event_category: categoryFilter,
+    game_mode: gameModeFilter
+  };
+
   if (client) {
     isSupabaseConfigured = true;
     try {
-      let query = client
-        .from('analytics_events')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1000);
+      // Fetch full dataset for current period without 1000 limit
+      currentEvents = await fetchAllEventsFromSupabase(client, dateRange.startDate, dateRange.endDate, filters);
 
-      if (campaignFilter && campaignFilter !== 'all') {
-        query = query.eq('campaign', campaignFilter);
+      // Fetch full dataset for previous comparison period if applicable
+      if (dateRange.prevStartDate && dateRange.prevEndDate) {
+        previousEvents = await fetchAllEventsFromSupabase(client, dateRange.prevStartDate, dateRange.prevEndDate, filters);
       }
 
-      const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        rawEvents = data as AnalyticsRow[];
-        isSupabaseConnected = true;
-        dataSource = 'supabase';
-      } else if (error) {
-        errorMessage = error.message;
-        rawEvents = inMemoryEvents;
-      } else {
-        isSupabaseConnected = true;
-        dataSource = 'supabase';
-        rawEvents = [];
-      }
+      isSupabaseConnected = true;
+      dataSource = 'supabase';
     } catch (err: any) {
+      console.warn('Supabase analytics query failed, using in-memory fallback:', err);
       errorMessage = err.message;
-      rawEvents = inMemoryEvents;
+      dataSource = 'simulated_fallback';
     }
-  } else {
-    rawEvents = inMemoryEvents;
   }
 
-  if (campaignFilter && campaignFilter !== 'all' && dataSource === 'simulated_fallback') {
-    rawEvents = rawEvents.filter(e => e.campaign === campaignFilter);
+  // Fallback to in-memory events if Supabase is not connected or query returned empty/failed
+  if (dataSource === 'simulated_fallback' || currentEvents.length === 0) {
+    currentEvents = inMemoryEvents.filter(e => {
+      const eTime = new Date(e.created_at).getTime();
+      if (eTime < dateRange.startDate.getTime() || eTime > dateRange.endDate.getTime()) return false;
+      if (campaignFilter && campaignFilter !== 'all' && e.campaign !== campaignFilter) return false;
+      if (sourceFilter && sourceFilter !== 'all' && e.source !== sourceFilter) return false;
+      if (categoryFilter && categoryFilter !== 'all' && e.event_category !== categoryFilter) return false;
+      if (gameModeFilter && gameModeFilter !== 'all' && e.data?.game_mode !== gameModeFilter) return false;
+      return true;
+    });
+
+    if (dateRange.prevStartDate && dateRange.prevEndDate) {
+      previousEvents = inMemoryEvents.filter(e => {
+        const eTime = new Date(e.created_at).getTime();
+        if (eTime < dateRange.prevStartDate!.getTime() || eTime > dateRange.prevEndDate!.getTime()) return false;
+        if (campaignFilter && campaignFilter !== 'all' && e.campaign !== campaignFilter) return false;
+        if (sourceFilter && sourceFilter !== 'all' && e.source !== sourceFilter) return false;
+        if (categoryFilter && categoryFilter !== 'all' && e.event_category !== categoryFilter) return false;
+        if (gameModeFilter && gameModeFilter !== 'all' && e.data?.game_mode !== gameModeFilter) return false;
+        return true;
+      });
+    }
   }
 
-  const aggregated = computeAnalyticsSummary(rawEvents);
+  const dateRangeMeta = {
+    preset: dateRange.preset as any,
+    startDate: dateRange.startDate.toISOString(),
+    endDate: dateRange.endDate.toISOString(),
+    previousStartDate: dateRange.prevStartDate?.toISOString(),
+    previousEndDate: dateRange.prevEndDate?.toISOString()
+  };
+
+  const aggregated = computeAnalyticsSummary(currentEvents, previousEvents, dateRangeMeta);
+
+  if (aggregated.analyticsHealth) {
+    aggregated.analyticsHealth.supabaseConfigured = isSupabaseConfigured;
+    aggregated.analyticsHealth.supabaseConnected = isSupabaseConnected;
+  }
 
   res.json({
     success: true,
@@ -595,42 +1671,84 @@ app.get('/api/analytics/summary', async (req, res) => {
     statusNote: 'WhatsApp Order Intent tracked; revenue attribution pending confirmed customer pickup/delivery.',
     error: errorMessage,
     lastUpdated: new Date().toISOString(),
+    dateRange: dateRangeMeta,
     ...aggregated,
-    rawEvents: rawEvents.slice(0, 100)
+    rawEvents: currentEvents.slice(0, 100)
   });
 });
 
-// GET /api/analytics/events - Raw events
+// GET /api/analytics/events - Raw events with server-side pagination and diagnostic filters
 app.get('/api/analytics/events', async (req, res) => {
   const client = getSupabaseClient();
-  const limit = Math.min(parseInt(req.query.limit as string) || 200, 1000);
+  const page = Math.max(parseInt(req.query.page as string, 10) || 1, 1);
+  const pageSize = Math.min(Math.max(parseInt(req.query.pageSize as string, 10) || 15, 5), 100);
+  const offset = (page - 1) * pageSize;
+  const search = (req.query.search as string || '').toLowerCase().trim();
+  const eventFilter = req.query.event as string;
+  const categoryFilter = (req.query.category as string) || (req.query.event_category as string);
+  const sourceFilter = req.query.source as string;
+  const campaignFilter = req.query.campaign as string;
+
+  let isSupabaseConfigured = false;
+  let isSupabaseConnected = false;
 
   if (client) {
+    isSupabaseConfigured = true;
     try {
-      const { data, error } = await client
-        .from('analytics_events')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (!error && data) {
+      let query = client.from('analytics_events').select('*', { count: 'exact' }).order('created_at', { ascending: false });
+      if (eventFilter && eventFilter !== 'all') query = query.eq('event', eventFilter);
+      if (categoryFilter && categoryFilter !== 'all') query = query.eq('event_category', categoryFilter);
+      if (sourceFilter && sourceFilter !== 'all') query = query.eq('source', sourceFilter);
+      if (campaignFilter && campaignFilter !== 'all') query = query.eq('campaign', campaignFilter);
+      
+      const { data, count, error } = await query.range(offset, offset + pageSize - 1);
+      if (!error && data && data.length > 0) {
         return res.json({
           success: true,
           dataSource: 'supabase',
           isSupabaseConfigured: true,
           isSupabaseConnected: true,
-          events: data
+          events: data,
+          total: count || data.length,
+          page,
+          pageSize,
+          totalPages: Math.ceil((count || data.length) / pageSize)
         });
       }
-    } catch {}
+    } catch (err) {
+      console.warn('Supabase raw events query failed, fallback to memory:', err);
+    }
   }
 
-  return res.json({
+  // Filter in-memory events
+  let filtered = [...inMemoryEvents];
+  if (eventFilter && eventFilter !== 'all') filtered = filtered.filter(e => e.event === eventFilter);
+  if (categoryFilter && categoryFilter !== 'all') filtered = filtered.filter(e => e.event_category === categoryFilter);
+  if (sourceFilter && sourceFilter !== 'all') filtered = filtered.filter(e => e.source === sourceFilter);
+  if (campaignFilter && campaignFilter !== 'all') filtered = filtered.filter(e => e.campaign === campaignFilter);
+  if (search) {
+    filtered = filtered.filter(e => 
+      e.event.toLowerCase().includes(search) ||
+      (e.visitor_id && e.visitor_id.toLowerCase().includes(search)) ||
+      (e.session_id && e.session_id.toLowerCase().includes(search)) ||
+      (e.player_id && e.player_id.toLowerCase().includes(search)) ||
+      (e.campaign && e.campaign.toLowerCase().includes(search)) ||
+      (e.source && e.source.toLowerCase().includes(search))
+    );
+  }
+
+  const paginated = filtered.slice(offset, offset + pageSize);
+
+  res.json({
     success: true,
     dataSource: 'simulated_fallback',
-    isSupabaseConfigured: false,
-    isSupabaseConnected: false,
-    events: inMemoryEvents.slice(0, limit)
+    isSupabaseConfigured,
+    isSupabaseConnected,
+    events: paginated,
+    total: filtered.length,
+    page,
+    pageSize,
+    totalPages: Math.ceil(filtered.length / pageSize)
   });
 });
 
@@ -839,8 +1957,8 @@ app.post('/api/analytics/events', async (req, res) => {
 // Cyberwrap Rewards & Admin Routes
 // -------------------------------------------------------------
 
-// GET /api/admin/rewards/overview - Relational metrics & overview for Admin
-app.get('/api/admin/rewards/overview', async (req, res) => {
+// GET /api/admin/rewards/overview and /api/rewards/overview - Relational metrics & overview for Admin
+app.get(['/api/admin/rewards/overview', '/api/rewards/overview'], async (req, res) => {
   const client = getSupabaseClient();
   let dataSource: 'supabase' | 'simulated_fallback' = 'simulated_fallback';
   let isSupabaseConfigured = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -967,8 +2085,8 @@ app.get('/api/admin/rewards/overview', async (req, res) => {
   });
 });
 
-// GET /api/admin/rewards/coupons - List coupons with optional status filter & search
-app.get('/api/admin/rewards/coupons', async (req, res) => {
+// GET /api/admin/rewards/coupons and /api/rewards/coupons - List coupons with optional status filter & search
+app.get(['/api/admin/rewards/coupons', '/api/rewards/coupons'], async (req, res) => {
   const status = req.query.status as string;
   const search = (req.query.search as string || '').toLowerCase();
   const client = getSupabaseClient();
@@ -1016,8 +2134,8 @@ app.get('/api/admin/rewards/coupons', async (req, res) => {
   });
 });
 
-// PATCH /api/admin/rewards/coupons/:id/status - Manually update coupon status
-app.patch('/api/admin/rewards/coupons/:id/status', async (req, res) => {
+// PATCH /api/admin/rewards/coupons/:id/status and /api/rewards/coupons/:id/status - Manually update coupon status
+app.patch(['/api/admin/rewards/coupons/:id/status', '/api/rewards/coupons/:id/status'], async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 

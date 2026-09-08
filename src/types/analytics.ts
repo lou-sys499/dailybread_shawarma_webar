@@ -147,6 +147,134 @@ export interface SourcePerformanceItem {
 
 export type GameModeFilter = 'all' | 'challenge' | 'free_roam';
 
+export type DateRangePreset = 'today' | '7d' | '30d' | '90d' | 'all' | 'custom';
+
+export interface DateRangeState {
+  preset: DateRangePreset;
+  startDate: string;
+  endDate: string;
+}
+
+export interface MetricComparison {
+  current: number;
+  previous: number;
+  changePercent: number | null; // null if previous === 0 or no previous period
+  diffPoints?: number; // percentage point difference (e.g. +14.2)
+  trend: 'up' | 'down' | 'neutral';
+}
+
+export interface BusinessOverviewKPIs {
+  uniqueVisitors: MetricComparison;
+  sessions: MetricComparison;
+  whatsappOrderIntent: MetricComparison;
+  whatsappIntentRate: MetricComparison; // in %
+  dailyRunUsers: MetricComparison;
+  gameCompletions: MetricComparison;
+  couponsEarned: MetricComparison;
+  couponsRedeemed: MetricComparison;
+}
+
+export interface CommercialImpactAnalysis {
+  dailyRunUsersCount: number;
+  dailyRunIntentCount: number;
+  dailyRunIntentRate: number; // %
+  nonPlayersCount: number;
+  nonPlayerIntentCount: number;
+  nonPlayerIntentRate: number; // %
+  diffPercentagePoints: number; // e.g. +16.7
+  dailyRunCouponsEarned: number;
+  dailyRunCouponsRedeemed: number;
+  postOrderInvitations: number;
+  postOrderStarts: number;
+  postOrderCompletionRate: number;
+}
+
+export interface WhatsAppOrderIntentMetrics {
+  orderCtaClicks: number;
+  uniqueVisitorsInitiating: number;
+  whatsappOpens: number;
+  uniqueVisitorsOpening: number;
+  intentToOpenRate: number;
+  intentRatePerVisitor: number;
+  intentRatePerSession: number;
+  couponAssistedIntent: number;
+}
+
+export interface CouponAssistedMetrics {
+  totalOrderIntent: number;
+  couponAssistedIntent: number;
+  couponAssistedPercent: number;
+  couponsEarned: number;
+  couponsActive: number;
+  couponsRedeemed: number;
+  redemptionRate: number;
+}
+
+export interface TopProductItem {
+  name: string;
+  count: number;
+}
+
+export interface TopPlacementItem {
+  placement: string;
+  count: number;
+}
+
+export interface WebsitePerformanceMetrics {
+  websiteFunnel: FunnelStep[];
+  topViewedProducts: TopProductItem[];
+  topAddToCartProducts: TopProductItem[];
+  topOrderingCtaPlacements: TopPlacementItem[];
+}
+
+export interface HeatmapClickPoint {
+  id: string | number;
+  element_id?: string;
+  element_type?: string;
+  placement: string;
+  x_normalized: number;
+  y_normalized: number;
+  viewport_width?: number;
+  viewport_height?: number;
+  created_at?: string;
+}
+
+export interface TopClickedElement {
+  element_id: string;
+  element_type?: string;
+  placement: string;
+  count: number;
+}
+
+export interface ScrollRetentionItem {
+  depth: number; // 25, 50, 75, 90, 100
+  visitorsReached: number;
+  retentionPercent: number; // % of total unique visitors
+}
+
+export interface AnalyticsHealthStatus {
+  supabaseConfigured: boolean;
+  supabaseConnected: boolean;
+  eventIngestionHealthy: boolean;
+  lastEventTimestamp: string | null;
+  lastEventAgo: string;
+  visitorTrackingActive: boolean;
+  sessionTrackingActive: boolean;
+  dailyRunTrackingActive: boolean;
+  whatsappTrackingActive: boolean;
+  rewardsApiActive: boolean;
+  revenueAttributionStatus: 'Pending Confirmation';
+}
+
+export interface BusinessInsight {
+  id: string;
+  type: 'positive' | 'neutral' | 'info';
+  title: string;
+  message: string;
+  sampleSize: number;
+  isSufficientSample: boolean;
+}
+
 export interface EventFrequencyItem {
   event: string;
   displayName: string;
@@ -185,4 +313,24 @@ export interface AnalyticsDashboardData {
   dataSource: 'supabase' | 'simulated_fallback';
   lastUpdated: string;
   error?: string | null;
+  // Enhanced Customer Intelligence fields
+  dateRange?: {
+    range: DateRangePreset;
+    startDate: string;
+    endDate: string;
+    previousStartDate?: string;
+    previousEndDate?: string;
+  };
+  businessOverview?: BusinessOverviewKPIs;
+  commerceFunnel?: FunnelStep[];
+  dailyRunFunnel?: FunnelStep[];
+  commercialImpact?: CommercialImpactAnalysis;
+  whatsappIntentMetrics?: WhatsAppOrderIntentMetrics;
+  couponAssistedMetrics?: CouponAssistedMetrics;
+  websitePerformance?: WebsitePerformanceMetrics;
+  heatmapClicks?: HeatmapClickPoint[];
+  topClickedElements?: TopClickedElement[];
+  scrollRetention?: ScrollRetentionItem[];
+  analyticsHealth?: AnalyticsHealthStatus;
+  insights?: BusinessInsight[];
 }

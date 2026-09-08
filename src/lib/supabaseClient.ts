@@ -135,28 +135,37 @@ export async function authenticateAdmin(emailOrPass: string, password?: string):
     }
   }
 
-  // 2. Demo Admin Key validation - strictly isolated to development/preview environments without Supabase Auth
+  // 2. Admin Key / Password validation (dailybread@99)
   const isDevOrUnconfigured = !metaEnv.PROD || !isSupabaseClientConfigured();
   if (isDevOrUnconfigured) {
-    const normalizedInput = emailOrPass.toLowerCase().trim();
-    const validPasses = ['admin', 'admin123', 'cyberwrap', 'cyberwrap2026', 'admin@cyberwrap.io'];
+    const cleanEmailOrPass = emailOrPass.trim();
+    const cleanPassword = (password || '').trim();
+    const ADMIN_SECRET_PASSWORD = 'dailybread@99';
 
-    if (validPasses.includes(normalizedInput) || (password && validPasses.includes(password.toLowerCase().trim()))) {
+    // The user explicitly configured the password to be "dailybread@99"
+    const isPasswordMatch = cleanPassword === ADMIN_SECRET_PASSWORD || cleanEmailOrPass === ADMIN_SECRET_PASSWORD;
+
+    if (isPasswordMatch) {
       const mockUser: AuthUserProfile = {
         id: 'usr_admin_' + Math.floor(Math.random() * 90000 + 10000),
-        email: normalizedInput.includes('@') ? normalizedInput : 'admin@cyberwrap.io',
+        email: cleanEmailOrPass.includes('@') && cleanEmailOrPass !== ADMIN_SECRET_PASSWORD ? cleanEmailOrPass : 'admin@dailybreadshawarma.com',
         role: 'admin',
         isAdmin: true,
       };
 
       const session: LocalAuthSession = {
         user: mockUser,
-        token: 'jwt_mock_' + Date.now(),
+        token: 'jwt_admin_' + Date.now(),
         expiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
       };
 
       localStorage.setItem(MOCK_ADMIN_KEY, JSON.stringify(session));
       return { success: true, user: mockUser };
+    } else {
+      return {
+        success: false,
+        error: 'Incorrect administrator password. Access denied.'
+      };
     }
   }
 
@@ -164,7 +173,7 @@ export async function authenticateAdmin(emailOrPass: string, password?: string):
     success: false, 
     error: isSupabaseClientConfigured()
       ? 'Invalid administrator credentials. Please sign in with your registered Supabase Admin account.'
-      : 'Invalid administrator credentials. Try "admin" or sign in with your administrator key.'
+      : 'Invalid administrator password. Access denied.'
   };
 }
 
